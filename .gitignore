@@ -1,0 +1,13 @@
+# Internal review notes — contains private/company-specific context. NEVER publish.
+_REVIEW.md
+
+# Secrets — never commit
+.env
+.env.local
+*.token
+*token*.txt
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
