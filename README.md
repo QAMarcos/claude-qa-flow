@@ -44,7 +44,7 @@ Claude Code loads **personal skills** from `~/.claude/skills/<skill-name>/SKILL.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/<your-org>/claude-qa-flow.git
+git clone https://github.com/QAMarcos/claude-qa-flow.git
 cd claude-qa-flow
 
 # 2. Copy both skill folders into your personal skills directory
