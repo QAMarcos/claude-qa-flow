@@ -14,7 +14,7 @@ structure that works is **child bugs linked to the parent ticket + one index com
 2. **Mirror the fields of a sibling bug in the same epic/project** (fetch it) instead of the tracker
    defaults: epic, team/group, workflow state, requester, labels. The bug lands in the queue and board
    the team already watches.
-3. **Owner:** the parent ticket's owner unless told otherwise — they are the one who will fix it.
+3. **Owner:** whoever will fix it — the owner-by-layer rule in `file-bug-ticket` (front-end vs back-end), or the parent ticket's owner when they own that layer. The user's override wins.
 4. **Link each bug to the parent with `relates to`.** Never `blocks`: a bug with its own ticket
    follows its own lifecycle and does not hold the parent. If a finding is genuinely blocking (per
    the severity gate), what changes is the *recommendation* for the parent's column, not the link type.

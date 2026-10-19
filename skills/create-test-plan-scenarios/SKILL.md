@@ -83,7 +83,7 @@ Pull the equivalent of: `title/name`, `description`, `type`, custom fields, `com
 ### 2. Enrich context (best-effort)
 
 - For each linked ticket, fetch it one level deep to understand siblings/blockers — don't recurse.
-- For markdown links in the description and comments (Google Docs, Figma, internal wikis): try `WebFetch`. If it requires auth or fails, list it as `context not loaded — open manually` and proceed.
+- For markdown links in the description and comments (Google Docs, Figma, internal wikis): try your harness's web-fetch tool. If it requires auth or fails, list it as `context not loaded — open manually` and proceed.
 - Read all comments — product owners and QA often clarify the spec there (exact copy, tokens, scope). These clarifications override the original description.
 
 ### 3. Draft scenarios

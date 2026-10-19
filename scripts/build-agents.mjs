@@ -27,35 +27,42 @@ const CLAUDE_TOOLS = {
   "read-only": "Read, Grep, Glob, Bash, PowerShell",
 };
 
-// OpenCode enforces these natively (last matching rule wins). Use `deny`, never `ask`, inside
-// subagents: a rejected `ask` fails the whole subagent and its report is lost, while `deny` returns
-// an error the model can work around. Reads (GET) stay allowed; only mutating HTTP is denied.
+// OpenCode enforces these natively. Patterns are globs; OpenCode checks each command of a pipeline
+// or list on its own (observed in 1.18.31) and the last matching rule wins. Coarser than the Claude
+// Code hook: no host check, so mutating calls to localhost are denied too. Use `deny`, never `ask`, inside subagents: a rejected `ask` fails the whole
+// subagent and its report is lost, while `deny` returns an error the model can work around.
+// Every pattern starts with `*` so wrappers (`bash -c "curl ..."`) and absolute paths are caught.
 const MUTATING_HTTP = [
   "curl*X P*", "curl*X D*", "curl*XP*", "curl*XD*", "curl*--request*",   // -X POST, -sX POST, -XPOST
-  "curl* -d*", "curl* -sd*", "curl* -sSd*", "curl*--data*",
+  "curl* -d*", "curl* -sd*", "curl* -sSd*", "curl* -fsSd*", "curl* -Ld*", "curl*--data*",
   "curl* -F*", "curl* -sF*", "curl*--form*", "curl*--json*", "curl* -T*", "curl*--upload-file*",
   "wget*--post*", "wget*--method*", "wget*--body*",
-  "http POST*", "http PUT*", "http PATCH*", "http DELETE*", "http *=*",       // HTTPie (data items imply POST)
+  "http POST*", "http PUT*", "http PATCH*", "http DELETE*", "http *=*", "http*--raw*", "http*--multipart*",
+  "https POST*", "https PUT*", "https PATCH*", "https DELETE*", "https *=*",
   "xh POST*", "xh PUT*", "xh PATCH*", "xh DELETE*", "xh *=*",
-  "Invoke-RestMethod*-Method P*", "Invoke-RestMethod*-Method D*",
-  "Invoke-WebRequest*-Method P*", "Invoke-WebRequest*-Method D*",
-];
-// Tracker CLIs and git history.
+  "Invoke-RestMethod*-Meth* P*", "Invoke-RestMethod*-Meth* D*",
+  "Invoke-WebRequest*-Meth* P*", "Invoke-WebRequest*-Meth* D*",
+].map((p) => `*${p}`);
+// Tracker CLIs and anything that creates or publishes commits.
 const TRACKER_CLI_AND_GIT = [
   "gh issue create*", "gh issue comment*", "gh issue edit*", "gh issue close*",
-  "gh pr comment*", "gh pr review*", "gh pr create*", "gh pr edit*", "gh api*",
+  "gh pr comment*", "gh pr review*", "gh pr create*", "gh pr edit*", "gh api*", "gh label create*", "gh project item-add*",
   "glab issue create*", "glab issue note*", "glab mr note*", "glab mr create*", "glab api*",
-  "git*commit*", "git*push*",
-];
-// Read-only reviewer: deny everything, then allow inspection commands. Anything that can write
-// (redirection, chaining, subshells) is denied again at the end — last matching rule wins.
-// Observed in OpenCode 1.18.31: a chain of allowed reads (`ls x && md5sum y`) still runs, because
-// each subcommand is checked on its own; redirection, `tee` and `sort -o` are denied.
+  "jira issue create*", "jira issue comment*", "jira issue edit*",
+  "git*commit*", "git*push*", "git*merge*", "git*rebase*", "git*cherry-pick*",
+].map((p) => `*${p}`);
+// Read-only reviewer: deny everything, allow inspection commands, and allow `sort` / `uniq` only in
+// the argument-less forms the dedupe pipelines use (so `sort -o f` and `uniq in out` stay denied).
+// Anything piped into another program is denied by the default rule. Chains of allowed reads
+// (`ls x && md5sum y`) still run, since each subcommand is checked on its own.
 const REVIEWER_ALLOW = [
   "ls*", "md5sum *", "sha256sum *", "shasum *", "md5 *", "file *", "wc *", "stat *",
-  "sort*", "uniq*", "cat *", "head *", "tail *", "grep *",
+  "cat *", "head *", "tail *", "grep *",
 ];
-const REVIEWER_DENY_AGAIN = ["*>*", "*;*", "*&*", "*`*", "*$(*", "*<(*", "*xargs*", "*tee*", "sort*-o*"];
+const REVIEWER_PIPE_STAGES = ["sort", "uniq -w32 -D", "uniq -w64 -D", "uniq -d"];
+const REVIEWER_DENY_AGAIN = [
+  "*>*", "*;*", "*&*", "*`*", "*$(*", "*<(*", "*xargs*", "*tee*", "file*-C*", "file*--compile*",
+];
 
 const OPENCODE_PERMISSION = {
   executor: [
@@ -65,7 +72,7 @@ const OPENCODE_PERMISSION = {
     "  task: deny",
     "  bash:",
     '    "*": allow',
-    ...[...MUTATING_HTTP, ...TRACKER_CLI_AND_GIT].map((p) => `    "${p}": deny`),
+    ...[...MUTATING_HTTP, ...TRACKER_CLI_AND_GIT].map((p) => `    ${JSON.stringify(p)}: deny`),
   ],
   "read-only": [
     "permission:",
@@ -74,7 +81,8 @@ const OPENCODE_PERMISSION = {
     "  task: deny",
     "  bash:",
     '    "*": deny',
-    ...REVIEWER_ALLOW.map((p) => `    "${p}": allow`),
+    ...REVIEWER_ALLOW.map((p) => `    ${JSON.stringify(p)}: allow`),
+    ...REVIEWER_PIPE_STAGES.map((p) => `    ${JSON.stringify(p)}: allow`),
     ...REVIEWER_DENY_AGAIN.map((p) => `    ${JSON.stringify(p)}: deny`),
   ],
 };

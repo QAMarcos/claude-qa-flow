@@ -159,7 +159,7 @@ If the user gives both, ad-hoc wins; ask whether to still pull the ticket for co
 2. Pull: title, description, type, custom fields, comments, related-ticket links, existing checklist,
    **and the linked branches / pull requests**.
    - PRs say what was actually delivered. A follow-up PR named `fix: …` points straight at what
-     needs extra verification — e.g. a `fix: stack mobile search toggle` PR turns "test on mobile"
+     needs extra verification — e.g. a `fix: …` PR that touches the mobile layout turns "test on mobile"
      into a mandatory scenario.
    - PR merged but the AC is not observable in the app → probably a pending deploy. Confirm before failing it.
 3. For each link in description / comments (docs, designs, wikis), try to fetch it. If it needs auth

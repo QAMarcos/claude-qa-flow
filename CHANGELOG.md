@@ -18,7 +18,9 @@ Distilled from three months of daily use on a real product team.
 - **Harness-backed role boundaries (best effort):** read-only reviewer; no tracker writes or commits
   from either role — via a Claude Code PreToolUse hook (`scripts/guard-tracker-writes.mjs`, with
   regression cases in `scripts/test-guard.mjs` and an optional `QA_FLOW_GUARD_LOG` trace) or OpenCode
-  `permission` rules (`deny`, never `ask`: a rejected `ask` kills the whole subagent in OpenCode).
+  `permission` rules (`deny`, never `ask`: a rejected `ask` kills the whole subagent in OpenCode;
+  OpenCode checks each command of a pipeline separately). The hook covers shell wrappers, quoted and
+  absolute-path commands, `gh` / `glab` / `jira` writes and git history writes — 89 regression cases.
 - **`scripts/install.mjs`** — dependency-free installer per harness, never overwrites without `--force`.
 - **Validated** in Claude Code 2.1.296 (plugin) and OpenCode 1.18.31: skills and subagents load, and
   the guards block tracker writes, commits and reviewer writes with on-disk ground truth. The Codex

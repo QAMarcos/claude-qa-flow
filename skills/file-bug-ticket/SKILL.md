@@ -68,7 +68,7 @@ When the user does not specify:
 - **Requester:** the user, when they are reporting it.
 - **Language:** title and body **always in English**, whatever language the request came in.
 - **Owner, priority and placement:** always filled — see below. When filing from `manual-test`,
-  **mirror a sibling bug in the same epic/project** instead of these defaults.
+  **mirror a sibling bug in the same epic/project** for epic, team, state and labels instead of these defaults; the owner still follows the owner-by-layer table.
 
 ## Owner, priority and placement — always filled
 

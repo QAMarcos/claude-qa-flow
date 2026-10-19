@@ -31,10 +31,10 @@ Each skill also runs on its own.
 ## Why it works
 
 - **Roles, not one long prompt.** The executor, the reviewer and the tracker writer are separate roles with separate permissions. The reviewer never sees the executor's reasoning — only its claims and the evidence on disk — so it catches what the executor was anchored on.
-- **Permissions backed by the harness, not just requested.** Where the harness supports it, the packaged agents are blocked from the common ways of breaking their role: the reviewer runs only read-only commands, and neither role can post to the tracker or commit (a Claude Code hook, or OpenCode's native `permission` rules). This is a **best-effort guard on the command line** — code that does its own HTTP (a `node -e "fetch(…)"`, a request inside the Playwright spec) is not caught — so the role instructions stay the primary control and the human gate before every external write stays mandatory.
+- **Permissions backed by the harness, not just requested.** Where the harness supports it, the packaged agents are blocked from the common ways of breaking their role: the reviewer runs only read-only commands, and neither role can post to the tracker or commit (a Claude Code hook, or OpenCode's native `permission` rules). This is a **best-effort guard on the command line** — code that does its own HTTP (a `node -e "fetch(…)"`, a request inside the Playwright spec) is not caught — and neither are every shell wrapper or tracker CLI beyond `gh` / `glab` / `jira` — so the role instructions stay the primary control and the human gate before every external write stays mandatory.
 - **Evidence discipline.** A `PASS` must cite a screenshot that shows the claimed state; duplicate screenshots (same hash) expose interactions that never happened; a timed-out click is `INCONCLUSIVE`, never "after".
 - **Honest statuses.** `BLOCKED-BY-DEPENDENCY`, `PO-DECISION` and `INCONCLUSIVE` keep "the backend isn't there yet" and "the AC is ambiguous" from being reported as failures.
-- **Human in the loop for every external write.** Nothing is posted to your tracker without passing the reviewer and your explicit OK.
+- **Human in the loop for external writes.** Bug tickets and result comments from a QA run are posted only after the reviewer and your explicit OK; a test plan is posted after you approve the list (or automatically, if you explicitly enable auto mode for the session).
 - **Throwaway, not tracked.** Scripts, evidence and logs live in a git-ignored `_local/` folder and are never committed — and never auto-deleted while you may still want to re-run them.
 
 ## What's inside
@@ -90,11 +90,6 @@ The skills choose a tier per run — e.g. a one-assertion check gets `balanced`,
 /plugin install qa-flow@qa-flow
 ```
 
-Or in one step (Claude Code 2.1.275+):
-
-```
-/plugin install qa-flow --marketplace QAMarcos/claude-qa-flow
-```
 
 Skills, subagents and the guard hook are set up automatically. Skills appear namespaced: `/qa-flow:manual-test`.
 
@@ -136,7 +131,7 @@ All install targets skip folders that already exist unless you pass `--force`, a
 
 ### Upgrading from 1.x
 
-1.x was installed by copying `create-test-plan-scenarios/` and `manual-test/` into `~/.claude/skills/`. Remove those two folders before installing 2.x — otherwise the installer skips them (old content stays), and with the plugin you get both `manual-test` and `qa-flow:manual-test`. OpenCode also reads `~/.claude/skills/`, so stale 1.x copies show up there too.
+1.x was installed by copying `create-test-plan-scenarios/` and `manual-test/` into `~/.claude/skills/` (or a project's `.claude/skills/`). Remove those two folders before installing 2.x — otherwise the installer skips them (old content stays), and with the plugin you get both `manual-test` and `qa-flow:manual-test`. OpenCode also reads `~/.claude/skills/`, so stale 1.x copies show up there too.
 
 ## Configuration
 
@@ -152,7 +147,7 @@ Each `SKILL.md` has a **Configuration** section with placeholders. Nothing is ha
 | Scratch root | A **git-ignored** folder for throwaway work (default `_local/`). |
 | Owners / workspace ids | For `file-bug-ticket`: who owns front-end vs back-end bugs, default project, states. |
 
-**Local hosts.** The Claude Code hook lets the executor send mutating requests to `localhost`, `127.0.0.1` and `*.test` / `*.localhost` (e.g. seeding a local app); the OpenCode rules deny every mutating `curl`, local or not, because glob patterns cannot tell hosts apart reliably.
+**Local hosts.** The Claude Code hook lets the executor send mutating requests to `localhost`, `127.0.0.1` and `*.test` / `*.localhost` (e.g. seeding a local app); the OpenCode rules deny every mutating `curl`, local or not — they are glob patterns checked per command and do not look at hosts, so they are also coarser than the hook in general.
 
 Behind bot protection / a WAF? The throwaway Playwright config has a spot for the `userAgent`/header your infra requires — sourced from env, never hard-coded.
 
@@ -209,7 +204,8 @@ claude-qa-flow/
 │  ├─ opencode/agents/       OpenCode subagents           (generated)
 │  └─ codex/agents/          Codex custom agents          (generated)
 ├─ hooks/hooks.json          Claude Code guard hook
-├─ scripts/                  build-agents · guard-tracker-writes · install
+├─ scripts/                  build-agents · guard-tracker-writes · test-guard · install
+├─ .github/workflows/        CI: generated files up to date, guard regression cases, skill names
 ├─ CHANGELOG.md
 ├─ README.md
 └─ LICENSE
