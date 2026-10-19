@@ -34,7 +34,8 @@ Distilled from three months of daily use on a real product team.
 - Execution: six-section executor brief; short action/navigation/expect timeouts so a browser never
   hangs; network capture by blocklist, never allowlist.
 - **Evidence discipline:** evidence must prove the claim; hash-based duplicate detection; element
-  text dumps, not `body`; collapsed content proves nothing; re-open evidence before each `PASS`.
+  text dumps, not `body`; collapsed content proves nothing; re-open evidence before each `PASS`;
+  a model that cannot view images says so and backs visual claims with DOM reads.
 - Report: new statuses `BLOCKED-BY-DEPENDENCY`, `PO-DECISION`, `INCONCLUSIVE`; Findings and "Could
   not verify" sections; machine-checkable JSON summary.
 - **New Step 6 — independent review**, mandatory before any write, plus a **severity gate** whose

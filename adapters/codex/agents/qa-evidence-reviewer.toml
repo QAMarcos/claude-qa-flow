@@ -88,6 +88,10 @@ A `PASS` backed by evidence that does not show what the sentence claims is worse
   capture was global (blocklist). Otherwise write "no request to `<captured hosts>`".
 - **Before writing each `PASS`, re-open the evidence you are about to cite** and confirm it shows
   the state described. This is the step executors skip most often.
+- **If your model cannot view images, say so in the report** — never imply you looked at a
+  screenshot you could not see. Back each visual claim with an element-scoped DOM read or a
+  web-first assertion from the same run, list "screenshots not visually inspected" under *Could not
+  verify*, and leave the pixels for a vision-capable reviewer or the user.
 
 ## Severity gate
 

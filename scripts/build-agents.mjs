@@ -49,6 +49,8 @@ const TRACKER_CLI_AND_GIT = [
 ];
 // Read-only reviewer: deny everything, then allow inspection commands. Anything that can write
 // (redirection, chaining, subshells) is denied again at the end — last matching rule wins.
+// Observed in OpenCode 1.18.31: a chain of allowed reads (`ls x && md5sum y`) still runs, because
+// each subcommand is checked on its own; redirection, `tee` and `sort -o` are denied.
 const REVIEWER_ALLOW = [
   "ls*", "md5sum *", "sha256sum *", "shasum *", "md5 *", "file *", "wc *", "stat *",
   "sort*", "uniq*", "cat *", "head *", "tail *", "grep *",

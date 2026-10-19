@@ -57,11 +57,13 @@ Use the first option your harness supports:
 
 1. **Packaged agents** — if `qa-test-executor` and `qa-evidence-reviewer` are installed (Claude Code
    plugin, or the OpenCode/Codex adapters in this repo), dispatch them by name (the plugin namespaces
-   them, e.g. `qa-flow:qa-test-executor`). They carry the role prompt. In Claude Code and OpenCode they
-   also get a best-effort permission guard (reviewer read-only; no tracker writes or commits); in Codex
-   the boundary is instruction-only.
+   them, e.g. `qa-flow:qa-test-executor`). They carry the role prompt with its references inlined, so
+   do not point them at `roles/` — they spend the first turns searching for it. In Claude Code and
+   OpenCode they also get a best-effort permission guard (reviewer read-only; no tracker writes or
+   commits); in Codex the boundary is instruction-only.
 2. **Generic subagent** — spawn a fresh-context subagent and make its first instruction: "Read
-   `roles/test-executor.md` (or `roles/evidence-reviewer.md`) next to this SKILL.md and follow it."
+   `<absolute path>/roles/test-executor.md` (or `roles/evidence-reviewer.md`) and follow it" —
+   resolve the path next to this SKILL.md yourself; the subagent does not know where it is.
    Repeat the "never write to the tracker" rule in the brief, since nothing enforces it.
 3. **No subagents at all** — play the roles yourself, sequentially. For the review, start a clean
    pass: re-open the evidence from disk, ignore your earlier conclusions, and state in the report that
@@ -72,7 +74,8 @@ Use the first option your harness supports:
 A thin prompt ("run these scenarios") is what produces a fragile report. Carry all six sections:
 
 ```
-Follow roles/test-executor.md (manual-test skill). Environment: <staging|prod>. User/fixture: <which>.
+[Generic subagent only: Read <absolute path>/roles/test-executor.md and follow it.]
+Environment: <staging|prod>. User/fixture: <which>.
 
 ## Ticket and ACs
 <ACs verbatim — do not paraphrase; the executor compares this text with the screen>
