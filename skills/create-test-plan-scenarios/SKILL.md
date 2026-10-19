@@ -49,7 +49,7 @@ downgrade it to `balanced` — plan with the strongest model, execute with a che
 
 ## Configuration (fill these in for your setup)
 
-This skill is tracker-agnostic. Wire it to whatever issue tracker you use (Jira, Linear, GitHub Issues, Shortcut, …) by setting:
+This skill is tracker-agnostic. Connect it to whatever issue tracker you use (Jira, Linear, GitHub Issues, Shortcut, …) by setting:
 
 - **`TRACKER_API_BASE`** — base URL of your tracker's REST API (e.g. `https://your-tracker.example.com/api/v3`).
 - **`TRACKER_TOKEN`** — an API token. **Never hard-code it in this file.** Store it in a local secrets file or environment variable outside version control (e.g. `.env.local`, a local credentials file), and read it at runtime. Rotate it if it ever leaks.

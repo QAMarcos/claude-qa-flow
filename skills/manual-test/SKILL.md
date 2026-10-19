@@ -129,7 +129,7 @@ If the user gives both, ad-hoc wins; ask whether to still pull the ticket for co
 - **App under test** — staging and production URLs. Default to **staging**; never hit production
   without an explicit instruction in this turn.
 - **E2E repo** — run from your Playwright project so fixtures and page objects are reusable.
-- **Auth fixtures** — your stored `storageState` file(s), e.g. `playwright/fixtures/loginAuth.json`.
+- **Auth fixtures** — your stored `storageState` file(s), e.g. `playwright/.auth/user.json`.
 - **Page-object helpers** — prefer them over raw selectors when one already covers the flow.
 - **Scratch root** — one git-ignored folder for everything throwaway (default `_local/`, with
   `scripts/`, `evidence/<slug>/`, `logs/`). Never inside the committed suite or the repo root.

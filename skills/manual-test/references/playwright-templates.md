@@ -18,7 +18,7 @@ import { test, expect } from "@playwright/test";
 // If the project has page objects / action helpers for this flow, import and prefer them.
 
 // Reuse the project's stored auth so login is free.
-test.use({ storageState: "./playwright/fixtures/loginAuth.json" });
+test.use({ storageState: "./playwright/.auth/user.json" });
 
 test("manual: <one-line description>", async ({ page }) => {
   await page.goto("https://staging.<your-app>.example.com/<entry-point>");

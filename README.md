@@ -96,7 +96,7 @@ Or in one step (Claude Code 2.1.275+):
 /plugin install qa-flow --marketplace QAMarcos/claude-qa-flow
 ```
 
-Skills, subagents and the guard hook are wired automatically. Skills appear namespaced: `/qa-flow:manual-test`.
+Skills, subagents and the guard hook are set up automatically. Skills appear namespaced: `/qa-flow:manual-test`.
 
 ### OpenCode
 
@@ -148,7 +148,7 @@ Each `SKILL.md` has a **Configuration** section with placeholders. Nothing is ha
 | `TRACKER_TOKEN` | API token — **in env or a git-ignored `.env.local`, never in a skill file, never in git.** |
 | `TRACKER_STORY_URL` | Human-facing URL pattern for a ticket. |
 | App URLs | Staging / production (staging is the default; prod needs an explicit instruction). |
-| Auth fixtures | Your stored `storageState`, e.g. `playwright/fixtures/loginAuth.json`. |
+| Auth fixtures | Your stored `storageState`, e.g. `playwright/.auth/user.json`. |
 | Scratch root | A **git-ignored** folder for throwaway work (default `_local/`). |
 | Owners / workspace ids | For `file-bug-ticket`: who owns front-end vs back-end bugs, default project, states. |
 

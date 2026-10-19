@@ -83,7 +83,7 @@ if (plan.guard) {
   const hookPath = scope === "project" ? "$CLAUDE_PROJECT_DIR/.claude/qa-flow/guard-tracker-writes.mjs" : plan.guard.replace(/\\/g, "/");
   console.log(`
 The role guard is copied but NOT enabled — this script never edits your settings.
-To enable it, add this to ${settings} (or install the plugin instead, which wires it automatically):
+To enable it, add this to ${settings} (or install the plugin instead, which enables it automatically):
 
   "hooks": {
     "PreToolUse": [
