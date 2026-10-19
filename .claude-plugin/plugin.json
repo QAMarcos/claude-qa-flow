@@ -1,0 +1,10 @@
+{
+  "name": "qa-flow",
+  "version": "2.0.0",
+  "description": "Ticket → reviewed QA test plan → real-browser execution with evidence → independent review → terse bug tickets. Tracker-agnostic, Playwright-driven.",
+  "author": { "name": "Marcos Pereira" },
+  "homepage": "https://github.com/QAMarcos/claude-qa-flow",
+  "repository": "https://github.com/QAMarcos/claude-qa-flow",
+  "license": "MIT",
+  "keywords": ["qa", "testing", "playwright", "test-plan", "manual-testing", "bug-report", "agent-skills"]
+}

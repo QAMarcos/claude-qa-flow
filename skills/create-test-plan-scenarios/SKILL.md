@@ -1,13 +1,51 @@
 ---
 name: create-test-plan-scenarios
 description: Turn a task/ticket into a structured, professional QA test plan — a checklist of atomic, executable scenarios — and (optionally) post it back to your issue tracker. Use whenever the user asks to "create a test plan", "list test scenarios", "criar cenários de teste", "QA checklist for TICKET-XXXX", or otherwise wants a ticket turned into a verifiable QA plan. Works for any story type (UI, API, mobile, infra). Always runs a self-review pass before writing anything back.
+license: MIT
+compatibility: Any Agent Skills harness (Claude Code, OpenCode, Codex, ...). Tracker write-back needs shell access with curl (or equivalent) and an API token. Subagents recommended.
+metadata:
+  version: "2.0.0"
+  routing: router
 ---
 
 # Create Test Plan Scenarios
 
 Turns any task/ticket into a structured, professional QA test plan: a checklist of atomic, observable, independently-runnable scenarios. Optionally posts the checklist back to your issue tracker as native sub-tasks. Works for UI, API, mobile, and infra stories. Always runs a self-review pass before writing anything.
 
-> These scenarios are the source of truth consumed by the `manual-test` skill, which executes them against the running app.
+> These scenarios are the source of truth consumed by the `manual-test` skill, which executes them against the running app. Keep each one atomic and observable so it maps cleanly to an executable step.
+
+## Step 0 — Triage & delegation (mandatory)
+
+This skill is a **router**: generation and self-review go to a subagent; the posting gate stays with
+the user in the main conversation.
+
+**Delegated (subagent, fresh context):** read the ticket, draft the checklist, and run the
+self-review — Steps 1–5. The subagent **returns the checklist; it does not post.** Suggested brief:
+
+```
+Read the create-test-plan-scenarios SKILL.md and run it through Step 5 (self-review) inclusive.
+Do NOT post to the tracker. Ticket: <ID>. Focus hints: <any>.
+Return the final checklist and the [CONFIRM: …] flags still open.
+```
+
+If your harness has no subagents, run Steps 1–5 inline.
+
+**Stays inline (main conversation):** show the checklist, run Step 6 (confirm posting) and then post
+(Step 7) — an external write, and a cheap API call. Two cases are resolved **before** delegating:
+
+- Ticket closed/archived → require explicit confirmation, even in auto mode.
+- Empty description → do not delegate; ask the user for one sentence of context first.
+
+**Tier** (capability levels — map to your harness: `balanced` ≈ Sonnet-class, `deep` ≈ Opus-class /
+top reasoning tier; `deep+` = top tier at the highest reasoning effort):
+
+| Situation | Tier |
+|---|---|
+| Well-written ACs, scope of one screen/endpoint | `deep` |
+| Vague ticket, multi-system (web + mobile + API), or business rules to infer | `deep+` |
+
+This skill is `deep` by nature: the checklist is the source of truth `manual-test` executes. Do not
+downgrade it to `balanced` — plan with the strongest model, execute with a cheaper one.
 
 ## Configuration (fill these in for your setup)
 

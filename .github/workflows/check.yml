@@ -1,0 +1,25 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  generated-agents:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generated agent files match roles
+        run: node scripts/build-agents.mjs --check
+      - name: Guard hook regression cases
+        run: node scripts/test-guard.mjs
+      - name: Skill names match their folders
+        run: |
+          for f in skills/*/SKILL.md; do
+            dir=$(basename "$(dirname "$f")")
+            name=$(sed -n 's/^name: *//p' "$f" | head -1)
+            [ "$dir" = "$name" ] || { echo "::error file=$f::name '$name' != folder '$dir'"; exit 1; }
+          done
