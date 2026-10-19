@@ -11,3 +11,6 @@ _REVIEW.md
 .DS_Store
 Thumbs.db
 *.swp
+
+# Throwaway QA scratch (scripts, evidence, logs)
+_local/

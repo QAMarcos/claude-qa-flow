@@ -1,0 +1,23 @@
+{
+  "name": "qa-flow",
+  "owner": {
+    "name": "Marcos Pereira"
+  },
+  "metadata": {
+    "description": "QA workflow for AI coding agents: ticket to reviewed test plan, real-browser execution with independently reviewed evidence, and terse bug tickets."
+  },
+  "plugins": [
+    {
+      "name": "qa-flow",
+      "source": "./",
+      "description": "QA skills and agents: test-plan generation, manual test execution with independent evidence review, and bug filing.",
+      "version": "2.0.0",
+      "category": "testing",
+      "tags": [
+        "qa",
+        "playwright",
+        "testing"
+      ]
+    }
+  ]
+}
