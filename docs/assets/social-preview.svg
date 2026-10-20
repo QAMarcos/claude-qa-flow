@@ -1,0 +1,48 @@
+<!-- Source of docs/assets/social-preview.png (GitHub Settings → Social preview, 1280×640). Local fonts; render at 2x. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#FFFFFF" opacity="0.05"/>
+    </pattern>
+    <style>
+      .head { font-family: Bahnschrift, "Segoe UI", Arial, sans-serif; font-weight: 700; }
+      .mono { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; }
+      .white { fill: #ECEEF1; } .muted { fill: #7D8590; } .lime { fill: #C6F45B; } .amber { fill: #F5B83D; } .pink { fill: #FF5C8A; }
+      .row { font-size: 23px; }
+      .pill { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="640" fill="#0B0D10"/>
+  <rect width="1280" height="640" fill="url(#dots)"/>
+
+  <rect x="64" y="56" width="196" height="40" rx="20" fill="none" stroke="#C6F45B" stroke-width="1.5"/>
+  <circle cx="88" cy="76" r="5" fill="#C6F45B"/>
+  <text x="104" y="82" class="mono lime" font-size="17" letter-spacing="2">QA-FLOW 2.0</text>
+  <text x="1216" y="82" class="mono muted" font-size="17" text-anchor="end">Agent Skills for QA</text>
+
+  <text x="64" y="218" class="head white" font-size="104">qa-flow</text>
+  <text x="64" y="282" class="head white" font-size="40">From ticket to a verdict <tspan class="lime">you can trust.</tspan></text>
+
+  <rect x="64" y="330" width="1152" height="196" rx="14" fill="#14171C" stroke="#262B33" stroke-width="1.5"/>
+  <path d="M97 380 l7 7 l13 -15" fill="none" stroke="#C6F45B" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="132" y="388" class="mono white row">executor</text>
+  <text x="380" y="388" class="mono muted row">real browser · a screenshot per step</text>
+  <rect x="1104" y="366" width="80" height="30" rx="6" fill="#C6F45B" fill-opacity="0.14"/>
+  <text x="1144" y="387" class="mono lime pill" text-anchor="middle">PASS</text>
+
+  <path d="M99 425 l16 16 M115 425 l-16 16" fill="none" stroke="#FF5C8A" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="132" y="442" class="mono white row">reviewer</text>
+  <text x="380" y="442" class="mono muted row">screenshots identical · re-checked</text>
+  <rect x="1024" y="420" width="160" height="30" rx="6" fill="#F5B83D" fill-opacity="0.16"/>
+  <text x="1104" y="441" class="mono amber pill" text-anchor="middle">INCONCLUSIVE</text>
+
+  <rect x="97" y="477" width="22" height="22" rx="5" fill="none" stroke="#7D8590" stroke-width="2"/>
+  <text x="132" y="496" class="mono white row">you</text>
+  <text x="380" y="496" class="mono muted row">OK to publish</text>
+  <rect x="1024" y="474" width="160" height="30" rx="6" fill="#ECEEF1" fill-opacity="0.08"/>
+  <text x="1104" y="495" class="mono white pill" text-anchor="middle">AWAITING YOU</text>
+
+  <text x="64" y="590" class="mono white" font-size="20">github.com/QAMarcos/claude-qa-flow</text>
+  <text x="1216" y="590" class="mono muted" font-size="18" text-anchor="end">Claude Code · OpenCode · Playwright</text>
+</svg>

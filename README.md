@@ -1,6 +1,30 @@
-# claude-qa-flow
+<h1 align="center">claude-qa-flow</h1>
 
-A QA workflow for AI coding agents: turn a ticket into a reviewed test plan, execute it against your running web app in a real browser, have the evidence checked by an **independent reviewer**, and file terse, evidence-backed bugs.
+<p align="center">
+  <strong>From ticket to a verdict you can trust.</strong><br>
+  A QA workflow for AI coding agents: a reviewed test plan, a real-browser run, an independent evidence review, and evidence-backed bug tickets.
+</p>
+
+<p align="center">
+  <a href="https://github.com/QAMarcos/claude-qa-flow/actions/workflows/check.yml"><img alt="checks" src="https://img.shields.io/github/actions/workflow/status/QAMarcos/claude-qa-flow/check.yml?branch=main&label=checks&style=flat-square&labelColor=0B0D10&color=C6F45B"></a>
+  <a href="CHANGELOG.md"><img alt="version" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FQAMarcos%2Fclaude-qa-flow%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&style=flat-square&labelColor=0B0D10&color=C6F45B"></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/github/license/QAMarcos/claude-qa-flow?style=flat-square&labelColor=0B0D10&color=C6F45B"></a>
+  <a href="https://agentskills.io"><img alt="Agent Skills" src="https://img.shields.io/badge/Agent%20Skills-compatible-C6F45B?style=flat-square&labelColor=0B0D10"></a>
+  <a href="#claude-code--plugin-recommended"><img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude%20Code-plugin-C6F45B?style=flat-square&labelColor=0B0D10"></a>
+  <a href="#opencode"><img alt="OpenCode" src="https://img.shields.io/badge/OpenCode-tested-C6F45B?style=flat-square&labelColor=0B0D10"></a>
+</p>
+
+<p align="center">
+  <a href="#installation">Install</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#why-it-works">How it works</a> ·
+  <a href="#customizing-the-roles">Customize</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/qa-flow-diagram.png" alt="qa-flow: ticket and test plan (create-test-plan-scenarios), then executor, trust boundary, independent read-only reviewer and severity gate (manual-test), then bug ticket (file-bug-ticket); human approval at the plan, the evidence and before publishing." width="100%">
+</p>
 
 - **Harness-agnostic** — built on the open [Agent Skills](https://agentskills.io) format. Tested in [Claude Code](https://claude.com/claude-code) and [OpenCode](https://opencode.ai); ships an experimental (untested) adapter for OpenAI Codex; the skills run in any harness that reads `SKILL.md`.
 - **Model-agnostic** — the skills speak in capability tiers (`fast` / `balanced` / `deep`), not vendor model names. Map them to whatever your provider offers.
@@ -10,16 +34,6 @@ A QA workflow for AI coding agents: turn a ticket into a reviewed test plan, exe
 ---
 
 ## The flow
-
-```
- create-test-plan-scenarios        manual-test                                         file-bug-ticket
- ┌──────────────────────┐     ┌──────────────────────────────────────────────────┐   ┌────────────────┐
- │ ticket ──▶ checklist │ ──▶ │ resolve context ─▶ executor ─▶ reviewer ─▶ report │──▶│ terse bug +     │
- │ (+ self-review)      │ you │ (with the user)   (browser)   (independent,       │you│ evidence,       │
- │                      │ OK  │                               read-only)          │OK │ verified by GET │
- └──────────────────────┘     └──────────────────────────────────────────────────┘   └────────────────┘
-      "what to test"                         "actually test it"                         "report it"
-```
 
 1. **`create-test-plan-scenarios`** reads a ticket (description, ACs, comments, linked docs) and produces atomic, observable scenarios — including regression, edge cases and cross-surface side effects. It self-reviews the list and shows it to you before posting it back as sub-tasks.
 2. **You review the plan.** The model can misread an ambiguous spec and then test it the way it understood it. This is where you catch that.
@@ -205,7 +219,9 @@ claude-qa-flow/
 │  └─ codex/agents/          Codex custom agents          (generated)
 ├─ hooks/hooks.json          Claude Code guard hook
 ├─ scripts/                  build-agents · guard-tracker-writes · test-guard · install
-├─ .github/workflows/        CI: generated files up to date, guard regression cases, skill names
+├─ .github/                  CI (generated files, guard regression cases, skill names) · PR template
+├─ docs/assets/              README diagram and social preview (SVG source + rendered PNG)
+├─ CONTRIBUTING.md
 ├─ CHANGELOG.md
 ├─ README.md
 └─ LICENSE

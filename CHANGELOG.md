@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Docs
+
+- README hero with a rendered flow diagram (replaces the ASCII art), status badges and quick links.
+- `docs/assets/` holds the diagram and a social preview image (SVG source + PNG).
+- `CONTRIBUTING.md` and a pull request template with the checks CI runs.
+- `.gitattributes` pins LF line endings (authored on Windows, CI and hooks run on Linux).
+
 ## 2.0.0 — 2026-10-19
 
 Distilled from three months of daily use on a real product team.
