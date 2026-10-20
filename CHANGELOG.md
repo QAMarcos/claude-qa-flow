@@ -26,6 +26,13 @@ Distilled from three months of daily use on a real product team.
   the guards block tracker writes, commits and reviewer writes with on-disk ground truth. The Codex
   adapter is experimental and untested.
 
+### Docs
+
+- README hero with a rendered flow diagram (replaces the ASCII art), status badges and quick links.
+- `docs/assets/` holds the diagram and a social preview image (SVG source + PNG).
+- `CONTRIBUTING.md` and a pull request template with the checks CI runs.
+- `.gitattributes` pins LF line endings (authored on Windows, CI and hooks run on Linux).
+
 ### `manual-test`
 
 - Context: reads the ticket's linked branches/PRs (a merged PR without an observable AC is probably
