@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// Claude Code PreToolUse hook (Bash / PowerShell). Backs up the role boundaries of the
-// manual-test subagents, so common violations are blocked even if the model ignores its
+// Claude Code PreToolUse hook (Bash / PowerShell / Write / Edit). Backs up the role boundaries of
+// the manual-test subagents, so common violations are blocked even if the model ignores its
 // instructions:
 //
 //   qa-test-executor      may run anything EXCEPT mutating HTTP calls to non-local hosts, tracker
-//                         CLI writes (gh/glab), and git commit/push.
+//                         CLI writes (gh/glab), git commit/push, and writes to the knowledge bank
+//                         (.qa-flow/knowledge/ — by file tool or by an obvious shell write).
 //   qa-evidence-reviewer  read-only: only hashing / listing / reading commands, no redirection,
-//                         no subshells or script blocks.
+//                         no subshells or script blocks, no file-editing tools.
 //
 // Any other agent (including the main conversation) passes through untouched.
 // BEST EFFORT BY DESIGN: it inspects the command line, so code that does its own HTTP (a node or
@@ -21,6 +22,11 @@ const REVIEWER = "qa-evidence-reviewer";
 // Quotes count too, so wrappers like `bash -c "curl ..."` and `& "curl.exe" ...` are recognised.
 const WORD = String.raw`(^|[\s;|&(/\\"'])`;
 const WORD_END = String.raw`(\.exe)?(?=["')\s]|$)`;
+const FILE_TOOLS = /^(Write|Edit|MultiEdit|NotebookEdit)$/;
+// The default knowledge root. A project that moved it elsewhere is covered by the instructions only.
+const KNOWLEDGE = /(^|[\s"'=:/\\])\.qa-flow[/\\]knowledge([/\\\s"']|$)/i;
+// `.qa-flow` itself — deleting or moving it takes the bank with it.
+const BANK_PARENT = /(^|[\s"'=/\\])\.qa-flow[/\\]?(?=["'\s]|$)/i;
 
 let input;
 try {
@@ -31,8 +37,11 @@ try {
 
 // Plugin agents are namespaced ("qa-flow:qa-test-executor"); manual installs are not.
 const agent = String(input.agent_type ?? "").split(":").pop();
+const tool = String(input.tool_name ?? "");
 const command = String(input.tool_input?.command ?? "");
-const reason = agent === REVIEWER ? reviewerViolation(command)
+const filePath = String(input.tool_input?.file_path ?? input.tool_input?.notebook_path ?? "");
+const reason = FILE_TOOLS.test(tool) ? fileToolViolation(agent, filePath)
+  : agent === REVIEWER ? reviewerViolation(command)
   : agent === EXECUTOR ? executorViolation(command)
   : null;
 
@@ -50,12 +59,81 @@ process.stdout.write(JSON.stringify({
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
-    permissionDecisionReason: `${agent}: ${reason} Return your report to the orchestrator instead — tracker writes happen only after review and user approval.`,
+    permissionDecisionReason: `${agent}: ${reason} Return your report to the orchestrator instead — tracker and knowledge-bank writes happen only after review and user approval.`,
   },
 }));
 process.exit(0);
 
+function fileToolViolation(who, path) {
+  if (who === REVIEWER) return "the read-only reviewer may not create or edit files.";
+  if (who === EXECUTOR && KNOWLEDGE.test(normalisePath(path))) {
+    return "the knowledge bank is curated by the orchestrator with the user's approval; propose the entry in your report.";
+  }
+  return null;
+}
+
+// An obvious shell write INTO the knowledge bank, judged per command segment and by destination:
+// a redirection whose target is in the bank, `cp`/`mv`/`install`/`ln`/`Copy-Item`/`Move-Item` whose
+// last argument (or -Destination) is in the bank, or a command that edits or deletes its arguments
+// in place (rm, tee, touch, sed -i, Set-Content, …) with an argument in the bank. Reading the bank —
+// cat, grep, the checker, `cp` out of it, the checker's output redirected elsewhere — stays allowed.
+// A move OUT of the bank deletes the entry, so `mv`/`Move-Item` count with the bank on either side;
+// deleting `.qa-flow` itself counts too. Paths are normalised first (`//`, `/./`, `x/../`), a
+// redirection may touch the path (`>.qa-flow/…`, `>|`), wrappers are unwrapped (`sudo`, `env X=1`,
+// `nohup`, `bash -c "…"`), and words after `<` are inputs, not targets.
+// Known gaps (best effort): `cd .qa-flow && echo >> knowledge/x`, `cp -t <dir>`, `find -delete`,
+// `xargs rm`, `rsync`, `tar -C`, piping paths into `Remove-Item`, wrappers with their own options
+// (`bash -lc '…'`, `sudo -u x tee`, `env -i rm`, `git -C . rm`), and code that writes files itself
+// (`node -e "fs.appendFileSync(...)"`).
+function normalisePath(p) {
+  let s = p.replace(/\\/g, "/").replace(/\/(?:\.\/)+/g, "/").replace(/\/{2,}/g, "/");
+  while (/\/[^/.][^/]*\/\.\.\//.test(s)) s = s.replace(/\/[^/.][^/]*\/\.\.\//, "/");
+  return s;
+}
+
+function writesKnowledge(rawCmd) {
+  const cmd = normalisePath(rawCmd);
+  if (!KNOWLEDGE.test(cmd) && !/>\|?\s*\.qa-flow\/knowledge/i.test(cmd) && !BANK_PARENT.test(cmd)) return false;
+  return cmd.split(/\|\||&&|(?<!>)\||[;\n]/).some(segmentWritesKnowledge);
+}
+
+function segmentWritesKnowledge(rawSeg) {
+  // Unwrap `bash -c "…"` / `pwsh -Command "…"` and judge the inner command.
+  const shell = rawSeg.match(/(?:^|\s)(?:bash|sh|zsh|pwsh|powershell)(?:\.exe)?\s+(?:-\w+\s+)*-c(?:ommand)?\s+(["'])([\s\S]*)\1/i);
+  if (shell) return writesKnowledge(shell[2]);
+  for (const m of rawSeg.matchAll(/\d?>[>|]?\s*("[^"]*"|'[^']*'|[^\s"'|;&]+)/g)) {
+    if (KNOWLEDGE.test(" " + m[1].replace(/^["']|["']$/g, ""))) return true;
+  }
+  let words = rawSeg.trim().split(/\s+/);
+  // Drop wrappers and leading `VAR=value` assignments.
+  while (words.length && /^(sudo|env|nohup|command|time|exec|nice|\w+=\S*)$/i.test(words[0])) words = words.slice(1);
+  const lt = words.indexOf("<");
+  if (lt !== -1) words = words.slice(0, lt);
+  const name = (words[0] ?? "").replace(/^.*[\\/]/, "").replace(/\.exe$/i, "");
+  const rest = words.slice(1);
+  const inBank = (w) => KNOWLEDGE.test(" " + w.replace(/^-\w+:/, ""));
+  const deletesBank = (w) => BANK_PARENT.test(" " + w);
+  if (/^(mv|Move-Item|mi|move)$/i.test(name)) return rest.some(inBank) || rest.some(deletesBank);
+  if (/^(cp|install|ln|Copy-Item|cpi|copy)$/i.test(name)) {
+    const glued = rest.find((w) => /^-Dest(ination)?:/i.test(w));
+    const dest = rest.findIndex((w) => /^-Dest(ination)?$/i.test(w));
+    const target = glued ? glued : dest !== -1 ? rest[dest + 1] : rest.filter((w) => !w.startsWith("-")).pop();
+    return Boolean(target && inBank(target));
+  }
+  if (/^git$/i.test(name) && /^(rm|mv|restore|checkout|clean|stash)$/i.test(rest[0] ?? "")) return rest.some(inBank) || rest.some(deletesBank);
+  if (/^dd$/i.test(name)) return rest.some((w) => /^of=/i.test(w) && inBank(w.slice(3)));
+  if (/^(rm|rmdir|del|erase|unlink|touch|tee|mkdir|truncate|patch|Set-Content|Add-Content|Out-File|New-Item|Remove-Item|Rename-Item|Clear-Content|ni|sc|ac|ri|rni)$/i.test(name) ||
+      (/^sed$/i.test(name) && rest.some((w) => /^(-[a-zA-Z]*i|--in-place)/.test(w))) ||
+      (/^perl$/i.test(name) && rest.some((w) => /^-[a-zA-Z]*i/.test(w)))) {
+    return rest.some(inBank) || (/^(rm|rmdir|del|erase|Remove-Item|ri)$/i.test(name) && rest.some(deletesBank));
+  }
+  return false;
+}
+
 function executorViolation(cmd) {
+  if (writesKnowledge(cmd)) {
+    return "the knowledge bank is curated by the orchestrator with the user's approval; propose the entry in your report.";
+  }
   // Anything that creates or publishes commits — `git log --grep commit` stays allowed.
   if (/\bgit\b(\s+(-[cC]\s+\S+|--?[\w.-]+(=\S+)?))*\s+(commit|push|merge|rebase|cherry-pick|revert|am)\b/i.test(cmd)) {
     return "committing or pushing is not allowed for throwaway QA work.";

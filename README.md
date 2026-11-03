@@ -31,14 +31,21 @@
 - **Tracker-agnostic** — Jira, Linear, GitHub Issues, Shortcut, … via their REST APIs.
 - **Driven by [Playwright](https://playwright.dev/)** for execution, reusing your existing e2e project.
 
+> **New in 2.1** — `manual-test` looks at the real page before scripting (read-only **recon**) and
+> drops interaction workarounds like `force` clicks; an optional **knowledge bank** carries what past
+> runs learned, without ever deciding a verdict; and two new skills, **`scan-regression-candidates`**
+> and **`promote-to-regression`**, turn past manual runs into a few strong, proven regression tests.
+> [Changelog](CHANGELOG.md) · [Upgrading from 2.0](#upgrading-from-20)
+
 ---
 
 ## The flow
 
 1. **`create-test-plan-scenarios`** reads a ticket (description, ACs, comments, linked docs) and produces atomic, observable scenarios — including regression, edge cases and cross-surface side effects. It self-reviews the list and shows it to you before posting it back as sub-tasks.
 2. **You review the plan.** The model can misread an ambiguous spec and then test it the way it understood it. This is where you catch that.
-3. **`manual-test`** resolves context with you (environment, scope, known bugs, what has no backend yet), then hands a six-section brief to an **executor** that drives a headed browser through a throwaway Playwright script and captures evidence. An **independent reviewer** — fresh context, read-only — opens the screenshots itself, overturns fragile `PASS` verdicts, and classifies every finding with a **severity gate** whose default is *don't block the feature*.
-4. **`file-bug-ticket`** files one bug per root cause, inside a character budget, with the screenshots attached and everything verified by a GET — only after the review and your approval.
+3. **`manual-test`** resolves context with you (environment, scope, known bugs, what has no backend yet, and what the project's **knowledge bank** already knows), then hands a six-section brief to an **executor** that first takes a short read-only **recon** of the real page, then drives a headed browser through a throwaway Playwright script and captures evidence. An **independent reviewer** — fresh context, read-only — opens the screenshots itself, overturns fragile `PASS` verdicts, and classifies every finding with a **severity gate** whose default is *don't block the feature*.
+4. **`file-bug-ticket`** files one bug per root cause, inside a character budget, with the screenshots attached and everything verified by a GET — only after the review and your approval. Then `manual-test` proposes what the next run should not have to rediscover as a knowledge-bank update, written only on its own yes.
+5. **`scan-regression-candidates`** sweeps the scratch root of past runs and returns a short, scored backlog of the scenarios worth a permanent regression test — filtering out probes, one-offs and flows the suite already covers. **`promote-to-regression`** turns one of them into a spec in your suite's conventions, proves it stable and able to fail, has it reviewed, and asks before any commit.
 
 Each skill also runs on its own.
 
@@ -47,6 +54,9 @@ Each skill also runs on its own.
 - **Roles, not one long prompt.** The executor, the reviewer and the tracker writer are separate roles with separate permissions. The reviewer never sees the executor's reasoning — only its claims and the evidence on disk — so it catches what the executor was anchored on.
 - **Permissions backed by the harness, not just requested.** Where the harness supports it, the packaged agents are blocked from the common ways of breaking their role: the reviewer runs only read-only commands, and neither role can post to the tracker or commit (a Claude Code hook, or OpenCode's native `permission` rules). This is a **best-effort guard on the command line** — code that does its own HTTP (a `node -e "fetch(…)"`, a request inside the Playwright spec) is not caught — and neither are every shell wrapper or tracker CLI beyond `gh` / `glab` / `jira` — so the role instructions stay the primary control and the human gate before every external write stays mandatory.
 - **Evidence discipline.** A `PASS` must cite a screenshot that shows the claimed state; duplicate screenshots (same hash) expose interactions that never happened; a timed-out click is `INCONCLUSIVE`, never "after".
+- **Look before you script — but never copy the screen into the assertion.** A read-only recon (scoped aria snapshot, popups, test ids) tells the executor how to reach elements; expected values still come from the ACs, so a recon of a buggy page cannot turn the bug green. An AC target missing from the page is a `FAIL` candidate — never swapped for a look-alike — and every change to the script is logged for the reviewer.
+- **No interaction workarounds.** No `force` clicks, script clicks, coordinate clicks or removed overlays: if a user could not click it, neither does the test.
+- **A knowledge bank that informs, never decides.** Gotchas, locators that worked, known-bug pointers and product decisions live in small Markdown files with a source and a `last_verified` date, checked for secrets and staleness. The orchestrator routes each entry — a product decision goes to the reviewer as "verify against <ticket>", never to the executor — and every update waits for your explicit yes.
 - **Honest statuses.** `BLOCKED-BY-DEPENDENCY`, `PO-DECISION` and `INCONCLUSIVE` keep "the backend isn't there yet" and "the AC is ambiguous" from being reported as failures.
 - **Human in the loop for external writes.** Bug tickets and result comments from a QA run are posted only after the reviewer and your explicit OK; a test plan is posted after you approve the list (or automatically, if you explicitly enable auto mode for the session).
 - **Throwaway, not tracked.** Scripts, evidence and logs live in a git-ignored `_local/` folder and are never committed — and never auto-deleted while you may still want to re-run them.
@@ -58,11 +68,14 @@ Each skill also runs on its own.
 | `skills/create-test-plan-scenarios` | Ticket → reviewed QA checklist | Any Agent Skills harness |
 | `skills/manual-test` | Orchestrates executor → reviewer → report → filing | Any Agent Skills harness |
 | `skills/file-bug-ticket` | Terse, budgeted bug tickets with evidence | Any Agent Skills harness |
+| `skills/scan-regression-candidates` | Scratch root of past runs → short, scored automation backlog | Any Agent Skills harness |
+| `skills/promote-to-regression` | One reviewed manual run → a proven, reviewed regression spec | Any Agent Skills harness |
+| `skills/manual-test/scripts/check-knowledge.mjs` | Knowledge-bank checker (fields, secrets, PII, staleness) | Node ≥ 18, no dependencies |
 | `skills/manual-test/roles/*.md` | **Single source** of the executor and reviewer roles | Read directly by a generic subagent |
 | `agents/` | Claude Code subagents (generated) | Claude Code |
 | `adapters/opencode/agents/` | OpenCode subagents with `permission` rules (generated) | OpenCode |
 | `adapters/codex/agents/` | Codex custom agents, TOML (generated) | Codex |
-| `hooks/` + `scripts/guard-tracker-writes.mjs` | Blocks tracker writes / non-read commands for the two roles | Claude Code |
+| `hooks/` + `scripts/guard-tracker-writes.mjs` | Blocks tracker writes, knowledge-bank writes and non-read commands for the two roles | Claude Code |
 
 ### How each harness runs it
 
@@ -131,7 +144,7 @@ Skills → `~/.agents/skills/`, custom agents → `~/.codex/agents/`.
 node scripts/install.mjs --target agents
 ```
 
-Copies the skills to `~/.agents/skills/` (the cross-harness location). If your harness uses another folder, copy `skills/*` there — each skill is self-contained, roles included.
+Copies the skills to `~/.agents/skills/` (the cross-harness location). If your harness uses another folder, copy `skills/*` there — each skill is self-contained, roles included, except that `scan-regression-candidates` reads `promote-to-regression`'s scoring criteria: copy those two together.
 
 ### Claude Code without the plugin
 
@@ -142,6 +155,14 @@ node scripts/install.mjs --target claude
 Copies skills and subagents into `~/.claude/` and prints the `settings.json` snippet to enable the guard hook (the script never edits your settings).
 
 All install targets skip folders that already exist unless you pass `--force`, and support `--dry-run`. `--force` overwrites files but does not delete files removed upstream.
+
+### Upgrading from 2.0
+
+Re-run the installer with `--force` (or update the plugin): without it the installer skips the existing
+`manual-test`, agents and guard, and you keep a `manual-test` that neither runs recon nor saves the
+reviewed results the two new skills read, plus a guard that does not protect the knowledge bank. With
+the hook installed by hand (`--target claude`), also widen its matcher to the one the installer prints
+(`Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit`).
 
 ### Upgrading from 1.x
 
@@ -159,9 +180,11 @@ Each `SKILL.md` has a **Configuration** section with placeholders. Nothing is ha
 | App URLs | Staging / production (staging is the default; prod needs an explicit instruction). |
 | Auth fixtures | Your stored `storageState`, e.g. `playwright/.auth/user.json`. |
 | Scratch root | A **git-ignored** folder for throwaway work (default `_local/`). |
+| Knowledge root | Optional curated knowledge bank (default `.qa-flow/knowledge/`) — commit it if your team wants it shared. |
+| E2E suite | For `promote-to-regression` / `scan-regression-candidates`: where committed specs, page objects and fixtures live. |
 | Owners / workspace ids | For `file-bug-ticket`: who owns front-end vs back-end bugs, default project, states. |
 
-**Local hosts.** The Claude Code hook lets the executor send mutating requests to `localhost`, `127.0.0.1` and `*.test` / `*.localhost` (e.g. seeding a local app); the OpenCode rules deny every mutating `curl`, local or not — they are glob patterns checked per command and do not look at hosts, so they are also coarser than the hook in general.
+**Local hosts.** The Claude Code hook lets the executor send mutating requests to `localhost`, `127.0.0.1` and `*.test` / `*.localhost` (e.g. seeding a local app); the OpenCode rules deny every mutating `curl`, local or not — they are glob patterns checked per command and do not look at hosts, so they are also coarser than the hook in general. The same goes for the knowledge bank: OpenCode's rules stop shell writes into it, but its `edit` tool is not path-scoped, so file edits there rely on the role's instructions.
 
 Behind bot protection / a WAF? The throwaway Playwright config has a spot for the `userAgent`/header your infra requires — sourced from env, never hard-coded.
 
@@ -176,6 +199,8 @@ Invoke by name, or just describe the task — each skill lists its trigger phras
 /manual-test TICKET-1234
 /manual-test Log in as a free-tier user, open Billing, and verify the "Upgrade" CTA is visible.
 /file-bug-ticket The export button overlaps the table header at 1280px — screenshot in _local/evidence/export/
+/scan-regression-candidates
+/promote-to-regression TICKET-1234
 ```
 
 (Claude Code plugin: prefix with `qa-flow:`. OpenCode / Codex: invoke the skill by name or describe the task.)
@@ -187,7 +212,8 @@ Invoke by name, or just describe the task — each skill lists its trigger phras
 - **Let the reviewer run.** It is the step that most often changes the verdict — overturning a `PASS` backed by the wrong screenshot, or stopping a "bug" that is the product working as designed.
 - **Respect the severity gate.** Rare triggers, fault-injection-only findings and "reload fixes it" become Low notes, not blockers. Promoting to blocking is your call.
 - **Review the results too** before you post them or open a bug.
-- **Promote proven flows to real specs.** When a throwaway scenario keeps getting re-run, migrate it into your committed suite following your project's patterns.
+- **Promote few, strong flows to real specs.** Run `scan-regression-candidates` now and then; promote only what it scores as worth it, with `promote-to-regression`. A suite full of one-off checks is noise.
+- **Keep the knowledge bank small and dated.** Approve entries that save the next run real time; prune what nobody has verified in months.
 
 ## Customizing the roles
 
@@ -210,16 +236,22 @@ claude-qa-flow/
 │  ├─ manual-test/
 │  │  ├─ SKILL.md
 │  │  ├─ roles/              test-executor.md · evidence-reviewer.md   (single source)
-│  │  └─ references/         evidence discipline · severity gate · report format ·
-│  │                         Playwright templates · filing & comments
-│  └─ file-bug-ticket/SKILL.md
+│  │  ├─ assets/             recon.template.spec.ts   (copied by the executor; kept in sync with recon.md)
+│  │  ├─ references/         recon · evidence discipline · severity gate · report format ·
+│  │  │                      Playwright templates · filing & comments · knowledge bank
+│  │  └─ scripts/            check-knowledge.mjs
+│  ├─ file-bug-ticket/SKILL.md
+│  ├─ scan-regression-candidates/   SKILL.md · scripts/inventory.mjs
+│  └─ promote-to-regression/        SKILL.md · references/promotion-criteria.md
 ├─ agents/                   Claude Code subagents        (generated)
 ├─ adapters/
 │  ├─ opencode/agents/       OpenCode subagents           (generated)
 │  └─ codex/agents/          Codex custom agents          (generated)
 ├─ hooks/hooks.json          Claude Code guard hook
-├─ scripts/                  build-agents · guard-tracker-writes · test-guard · install
-├─ .github/                  CI (generated files, guard regression cases, skill names) · PR template
+├─ scripts/                  build-agents · guard-tracker-writes · install · test-guard · test-knowledge ·
+│                            test-inventory · check-recon-template
+├─ .github/                  CI (generated files, guard / knowledge-checker / inventory cases, recon template sync,
+│                            skill names) · PR template
 ├─ docs/assets/              README diagram and social preview (SVG source + rendered PNG)
 ├─ CONTRIBUTING.md
 ├─ CHANGELOG.md

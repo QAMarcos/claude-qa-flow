@@ -16,6 +16,12 @@ jobs:
         run: node scripts/build-agents.mjs --check
       - name: Guard hook regression cases
         run: node scripts/test-guard.mjs
+      - name: Knowledge-bank checker regression cases
+        run: node scripts/test-knowledge.mjs
+      - name: Recon template file matches recon.md
+        run: node scripts/check-recon-template.mjs
+      - name: Inventory script regression cases
+        run: node scripts/test-inventory.mjs
       - name: Skill names match their folders
         run: |
           for f in skills/*/SKILL.md; do

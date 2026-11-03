@@ -10,8 +10,8 @@
     {
       "name": "qa-flow",
       "source": "./",
-      "description": "QA skills and agents: test-plan generation, manual test execution with independent evidence review, and bug filing.",
-      "version": "2.0.0",
+      "description": "QA skills and agents: test-plan generation, manual test execution with recon and independent evidence review, a curated knowledge bank, bug filing, and promotion of strong scenarios to regression tests.",
+      "version": "2.1.0",
       "category": "testing",
       "tags": [
         "qa",

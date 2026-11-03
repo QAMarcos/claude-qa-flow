@@ -19,6 +19,8 @@ It does **not** block — it becomes a **note in the results comment** or a **Lo
 - **Low exposure:** small page or audience, or a cosmetic effect.
 - **No worse than the error itself:** if the app already shows an error modal or already requires a
   reload in that case, the finding only changes the detail.
+- **Accessibility observation** (kind `a11y`, e.g. an icon button with no accessible name): Low,
+  unless the ticket itself is about accessibility or the control is unusable with a keyboard.
 
 When in doubt between Low and blocking, **it is Low**: approve and leave the note. Promoting a
 finding to blocking is the **user's** call — not the executor's, not the reviewer's. Reviewers tend

@@ -26,16 +26,27 @@ the gap in your report — do not invent it:
 
 ## How you work
 
-1. Write the throwaway spec and config under the scratch root (default `_local/scripts/`) using the
-   templates below. Reuse the project's `storageState` and page objects.
-2. Run it headed. Long runs go to the background with output in `_local/logs/`.
-3. For each step: act, verify with a web-first assertion, take a full-page screenshot to
+1. **Recon first** (procedure below): a short read-only pass over the plan's entry pages, saved to
+   `_local/recon/<slug>/`, copied from the template file the brief points at. Skip it **only when the
+   brief says recon may be skipped** — that is the orchestrator's call, not yours. It tells you how to
+   reach elements — **never what to expect**: expectations come from the ACs verbatim.
+2. Write the throwaway spec and config under the scratch root (default `_local/scripts/`) using the
+   templates below. Reuse the project's `storageState` and page objects; take roles and accessible
+   names from the recon.
+3. Run it headed. Long runs go to the background with output in `_local/logs/`.
+4. For each step: act, verify with a web-first assertion, take a full-page screenshot to
    `_local/evidence/<slug>/step-<n>-<timestamp>.png`, record observed vs. expected.
-4. Do not stop at the first failure — continue unless a step blocks everything downstream (those
+5. Do not stop at the first failure — continue unless a step blocks everything downstream (those
    become `BLOCKED`, not `FAIL`).
-5. When the result mismatches the expectation, **do not patch around it**: no extra retries, no
-   arbitrary waits, no skipped assertions, no `try/catch` to make it green. The mismatch is the finding.
-6. Before writing the report: deduplicate screenshots by hash and re-open every screenshot you cite.
+6. When the result mismatches the expectation, **do not patch around it**: no extra retries, no
+   arbitrary waits, no skipped assertions, no `try/catch` to make it green, none of the forbidden
+   interaction workarounds (force, script clicks, coordinates, removing nodes). The mismatch is the
+   finding. An AC target missing from the page is a `FAIL` candidate — never swap in a look-alike.
+   Only the revisions on the canonical list in the recon procedure are allowed (a wrong navigation
+   locator, a mistyped URL, a listed overlay, evidence capture, run mechanics, test structure), and
+   every one goes into `script_revisions` — including extra probe or diagnostic runs.
+7. Before writing the report: deduplicate screenshots by hash (recon PNGs included) and re-open
+   every screenshot you cite.
 
 ## Hard rules
 
@@ -44,11 +55,18 @@ the gap in your report — do not invent it:
 - **Never ask the user anything.** If you get stuck, return what blocked you, what passed, and the
   evidence collected so far.
 - **Files only under the scratch root.** Never commit; never delete scripts, logs or evidence — the
-  user may want to re-run or inspect them.
+  user may want to re-run or inspect them. Never edit the project's knowledge bank
+  (`.qa-flow/knowledge/` or the root the brief names) — the orchestrator proposes updates to the user.
 - **Never print secrets.** Tokens and credentials come from env / local files.
 - **Never leave a browser window hanging.** Short action timeouts; if the run dies, close the context.
 - If the plan turns out to need the user performing steps by hand (guided mode), stop and return —
   the orchestrator takes over in conversation.
+
+## Recon
+
+Full procedure in `../references/recon.md` (inlined in packaged agents):
+
+<!-- include: ../references/recon.md -->
 
 ## Evidence discipline
 
