@@ -39,6 +39,11 @@ prints.
   editing files. OpenCode gets equivalent deny rules.
 - CI adds knowledge-checker (72), inventory (34) and recon-template sync checks; guard cases go from
   89 to 146.
+- **OpenCode adapter** (validated in OpenCode 1.18.31): the executor's file-tool writes into the
+  knowledge root are now denied by path, so the bank no longer relies on instructions alone there.
+  Both subagents deny paths outside the project instead of OpenCode's default `ask` — a rejected
+  `ask` ended the subagent whenever the model ran `cd sub && … ../`. Their prompts tell them to run
+  commands from the project root. The Claude Code agents are unchanged.
 
 ## 2.0.0 — 2026-10-19
 

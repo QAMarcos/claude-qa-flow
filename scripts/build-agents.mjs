@@ -54,9 +54,9 @@ const TRACKER_CLI_AND_GIT = [
 // Shell writes into the default knowledge root (curated by the orchestrator with the user's OK).
 // Globs cannot tell a destination from a source, so this is coarser than the Claude Code hook: it
 // also denies e.g. `cp .qa-flow/knowledge/x.md _local/` or `grep "->" .qa-flow/knowledge` — read
-// with `cat`/`grep` without `>` instead. OpenCode's `edit` tool is not path-scoped here, so a
-// file-tool edit is covered by instructions only. Verbs match only as a command word (line start or
-// after a space), so `platform` does not trip `rm`.
+// with `cat`/`grep` without `>` instead. File-tool writes (`edit` / `write`) are denied by path in
+// EDIT_DENY below. Verbs match only as a command word (line start or after a space), so `platform`
+// does not trip `rm`.
 const KNOWLEDGE_WRITES = [
   "*>*.qa-flow/knowledge*", "*>*.qa-flow\\knowledge*",
   ...["cp", "mv", "rm", "tee", "sed -i", "Set-Content", "Add-Content", "Out-File", "Remove-Item", "New-Item"]
@@ -75,10 +75,28 @@ const REVIEWER_DENY_AGAIN = [
   "*>*", "*;*", "*&*", "*`*", "*$(*", "*<(*", "*xargs*", "*tee*", "file*-C*", "file*--compile*",
 ];
 
+// OpenCode checks `edit` / `write` against the file's path relative to the project (backslashes on
+// Windows), so the knowledge root is denied in both spellings (observed in 1.18.31).
+const EDIT_DENY = ["*.qa-flow/knowledge*", "*.qa-flow\\knowledge*"];
+// OpenCode's default for paths outside the project is `ask`, and it resolves a shell command's
+// relative paths against the project root: `cd _local/scripts && cp ../../x y` counts as outside.
+// A rejected `ask` kills the subagent (and ends a non-interactive `opencode run`), so deny instead —
+// the model gets an error and retries from the project root. The deny also overrides OpenCode's own
+// allow for skill folders, so the manual-test folder (template, references) is allowed back for
+// `--scope user` installs. OpenCode re-adds its tool-output folder after these rules.
+const EXTERNAL_DIRECTORY = [
+  "  external_directory:",
+  '    "*": deny',
+  '    "*skills*manual-test*": allow',
+];
+
 const OPENCODE_PERMISSION = {
   executor: [
     "permission:",
-    "  edit: allow",
+    "  edit:",
+    '    "*": allow',
+    ...EDIT_DENY.map((p) => `    ${JSON.stringify(p)}: deny`),
+    ...EXTERNAL_DIRECTORY,
     "  webfetch: deny",
     "  task: deny",
     "  bash:",
@@ -88,6 +106,7 @@ const OPENCODE_PERMISSION = {
   "read-only": [
     "permission:",
     "  edit: deny",
+    ...EXTERNAL_DIRECTORY,
     "  webfetch: deny",
     "  task: deny",
     "  bash:",
@@ -171,6 +190,11 @@ function renderOpenCode({ meta, body }) {
     "---",
     "",
     `<!-- ${GENERATED} -->`,
+    "",
+    "> **OpenCode:** run every shell command from the project root with root-relative paths",
+    "> (`npx playwright test -c _local/scripts/manual.config.ts`, not `cd _local/scripts && … ../..`).",
+    "> OpenCode resolves relative paths against the project root, so a `cd` followed by `../` is",
+    "> treated as outside the project and denied.",
     "",
     body,
   ].join("\n");
