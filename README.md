@@ -82,7 +82,7 @@ Each skill also runs on its own.
 | Harness | Skills | Executor / reviewer | Role boundaries enforced by |
 |---|---|---|---|
 | Claude Code (plugin) — tested | ✅ | ✅ packaged subagents | `tools:` allowlist + PreToolUse hook (best effort) |
-| OpenCode — tested | ✅ | ✅ packaged subagents | native `permission` rules (best effort) |
+| OpenCode 1.18.31 — tested | ✅ | ✅ packaged subagents | native `permission` rules (best effort) |
 | Codex — experimental, untested | ✅ | ✅ custom agents | instructions only (subagents inherit the parent sandbox) |
 | Any other Agent Skills harness | ✅ | generic subagent reading `roles/*.md` | instructions only |
 | No subagents at all | ✅ | roles played sequentially; review flagged as *not independent* | instructions only |
@@ -129,6 +129,11 @@ node scripts/install.mjs --target opencode
 ```
 
 Copies the skills to `~/.config/opencode/skills/` and the subagents (with their `permission` rules) to `~/.config/opencode/agents/`. Use `--scope project` to install into the current project's `.opencode/` instead. Optionally pin a `deep`-tier model in the reviewer's `model:` line.
+
+Notes from validating 2.1 in OpenCode 1.18.31:
+
+- **Paths outside the project.** OpenCode resolves the relative paths of a shell command against the project root, so `cd _local/scripts && cp ../../x y` counts as outside the project. The packaged subagents deny that (the model gets an error and retries from the root); the main agent keeps OpenCode's default `ask`. In the TUI that is a prompt you answer; in a non-interactive `opencode run` an `ask` is rejected and **ends the session**. For unattended runs, tell the agent to run every command from the project root, or set `permission.external_directory` in your `opencode.json`.
+- **Same-named skills.** OpenCode also loads `~/.claude/skills/`. A skill there with the same name as one of these (e.g. an older `manual-test`) is shadowed without a warning. `OPENCODE_DISABLE_CLAUDE_CODE=1` turns that source off.
 
 ### Codex
 
@@ -184,7 +189,7 @@ Each `SKILL.md` has a **Configuration** section with placeholders. Nothing is ha
 | E2E suite | For `promote-to-regression` / `scan-regression-candidates`: where committed specs, page objects and fixtures live. |
 | Owners / workspace ids | For `file-bug-ticket`: who owns front-end vs back-end bugs, default project, states. |
 
-**Local hosts.** The Claude Code hook lets the executor send mutating requests to `localhost`, `127.0.0.1` and `*.test` / `*.localhost` (e.g. seeding a local app); the OpenCode rules deny every mutating `curl`, local or not — they are glob patterns checked per command and do not look at hosts, so they are also coarser than the hook in general. The same goes for the knowledge bank: OpenCode's rules stop shell writes into it, but its `edit` tool is not path-scoped, so file edits there rely on the role's instructions.
+**Local hosts.** The Claude Code hook lets the executor send mutating requests to `localhost`, `127.0.0.1` and `*.test` / `*.localhost` (e.g. seeding a local app); the OpenCode rules deny every mutating `curl`, local or not — they are glob patterns checked per command and do not look at hosts, so they are also coarser than the hook in general. The same goes for the knowledge bank: OpenCode's rules stop shell writes and file-tool writes (`edit` / `write`, denied by path) into it, but code that writes files itself (`node -e "fs.appendFileSync(…)"`) or a `cd` into the bank followed by a relative write is not caught — by the hook either.
 
 Behind bot protection / a WAF? The throwaway Playwright config has a spot for the `userAgent`/header your infra requires — sourced from env, never hard-coded.
 
