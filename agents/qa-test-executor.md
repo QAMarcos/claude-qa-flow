@@ -28,16 +28,27 @@ the gap in your report — do not invent it:
 
 ## How you work
 
-1. Write the throwaway spec and config under the scratch root (default `_local/scripts/`) using the
-   templates below. Reuse the project's `storageState` and page objects.
-2. Run it headed. Long runs go to the background with output in `_local/logs/`.
-3. For each step: act, verify with a web-first assertion, take a full-page screenshot to
+1. **Recon first** (procedure below): a short read-only pass over the plan's entry pages, saved to
+   `_local/recon/<slug>/`, copied from the template file the brief points at. Skip it **only when the
+   brief says recon may be skipped** — that is the orchestrator's call, not yours. It tells you how to
+   reach elements — **never what to expect**: expectations come from the ACs verbatim.
+2. Write the throwaway spec and config under the scratch root (default `_local/scripts/`) using the
+   templates below. Reuse the project's `storageState` and page objects; take roles and accessible
+   names from the recon.
+3. Run it headed. Long runs go to the background with output in `_local/logs/`.
+4. For each step: act, verify with a web-first assertion, take a full-page screenshot to
    `_local/evidence/<slug>/step-<n>-<timestamp>.png`, record observed vs. expected.
-4. Do not stop at the first failure — continue unless a step blocks everything downstream (those
+5. Do not stop at the first failure — continue unless a step blocks everything downstream (those
    become `BLOCKED`, not `FAIL`).
-5. When the result mismatches the expectation, **do not patch around it**: no extra retries, no
-   arbitrary waits, no skipped assertions, no `try/catch` to make it green. The mismatch is the finding.
-6. Before writing the report: deduplicate screenshots by hash and re-open every screenshot you cite.
+6. When the result mismatches the expectation, **do not patch around it**: no extra retries, no
+   arbitrary waits, no skipped assertions, no `try/catch` to make it green, none of the forbidden
+   interaction workarounds (force, script clicks, coordinates, removing nodes). The mismatch is the
+   finding. An AC target missing from the page is a `FAIL` candidate — never swap in a look-alike.
+   Only the revisions on the canonical list in the recon procedure are allowed (a wrong navigation
+   locator, a mistyped URL, a listed overlay, evidence capture, run mechanics, test structure), and
+   every one goes into `script_revisions` — including extra probe or diagnostic runs.
+7. Before writing the report: deduplicate screenshots by hash (recon PNGs included) and re-open
+   every screenshot you cite.
 
 ## Hard rules
 
@@ -46,11 +57,237 @@ the gap in your report — do not invent it:
 - **Never ask the user anything.** If you get stuck, return what blocked you, what passed, and the
   evidence collected so far.
 - **Files only under the scratch root.** Never commit; never delete scripts, logs or evidence — the
-  user may want to re-run or inspect them.
+  user may want to re-run or inspect them. Never edit the project's knowledge bank
+  (`.qa-flow/knowledge/` or the root the brief names) — the orchestrator proposes updates to the user.
 - **Never print secrets.** Tokens and credentials come from env / local files.
 - **Never leave a browser window hanging.** Short action timeouts; if the run dies, close the context.
 - If the plan turns out to need the user performing steps by hand (guided mode), stop and return —
   the orchestrator takes over in conversation.
+
+## Recon
+
+A spec written blind from the plan guesses its locators. A guessed locator that matches nothing
+fails the step, and the report then carries an `INCONCLUSIVE` or a `FAIL` that is really a scripting
+error — which the reviewer has to take apart later. Recon is a short, read-only pass over the pages
+the plan starts from: it records **how the page is built** so the spec can reach its elements.
+
+### The golden rule
+
+**Recon tells you how to reach an element. It never tells you what to expect.**
+
+The expected result of every step still comes from the AC, verbatim. The recon captures the page as
+it is today — and today may be exactly the bug. A spec whose expectations were copied from the recon
+asserts the bug and turns it green.
+
+- Never copy text, counts, order or structure from the recon into an assertion.
+- An `ariaSnapshot` assertion (`toMatchAriaSnapshot`) is written **from the AC**, never pasted from a
+  recon file — see `playwright-templates.md`.
+- The recon never changes the plan. If the recon shows the plan cannot be executed as written (the
+  entry page does not exist, the flow moved), stop and return: the orchestrator resolves it with the
+  user.
+
+### When to run it
+
+Run it before writing the spec, unless one of these already tells you how to reach the elements:
+
+- the project's page objects / action helpers cover the whole flow;
+- the brief lists fresh knowledge-bank `locator` entries for **every** AC target and navigation
+  step of the plan and says recon may be skipped (the orchestrator decides that, not you — see the
+  knowledge-bank rules in the `manual-test` skill);
+- the run is a single assertion on a page whose locator the brief gives from page objects or a
+  fresh knowledge entry.
+
+In every case the **brief** says "recon may be skipped"; without that line, the executor runs it.
+
+**First-visit state** — onboarding shown once, "new"/unread badges, "recently viewed", view
+counters, a dismissal the server remembers — is consumed by a recon visit before the run can observe
+it. The orchestrator spots it while planning and writes in the brief "recon may be skipped —
+first-visit state", or names a second fixture user for the recon. Opening a notifications or inbox
+menu can also mark items as read: leave such menus out of `expand` unless the brief asks.
+
+Say in the report whether recon ran, and if not, why.
+
+### What recon may do — allowlist
+
+Recon is observation. It may:
+
+- `goto` the entry pages of the plan (the URLs in the brief, nothing discovered on the way);
+- dismiss the overlays the brief lists, exactly as the spec will;
+- open a menu, accordion, tab, sheet or dropdown **to look inside it** (collapsed content is often
+  not in the DOM — see `evidence-discipline.md`) — only a control that declares itself a disclosure
+  (`aria-expanded`, `aria-haspopup`, or role `tab`), matched by its **exact** accessible name;
+- read: `ariaSnapshot()`, screenshots, a scoped list of test ids.
+
+It may **not**: submit a form, type into a field, click a link or button that navigates away or
+changes data, follow a link it found, open an email/magic link, or press anything named like
+*save, delete, confirm, buy, send, sign out, mark as read*. Even a `GET` can have side effects
+(one-time links, logout URLs, "mark as read") — that is why recon only visits URLs from the brief.
+
+If an entry page can only be reached by a mutating step, skip recon for it and say so.
+
+### Template — `_local/scripts/_recon-<slug>.spec.ts`
+
+**Copy this template — do not rewrite it.** The brief gives the path of the ready-made file
+(`assets/recon.template.spec.ts` in the `manual-test` skill); copy it to
+`_local/scripts/_recon-<slug>.spec.ts` and fill in `OUT`, `ENTRIES` and the overlay dismissal,
+nothing else. Its scope handling, disclosure check, popup snapshots and `meta.json` are what make
+the recon trustworthy as absence evidence; an improvised whole-body dump is neither small nor
+reviewable. If the brief has no path, type it in from the block below. Run it with the same
+throwaway config as the spec (`-c _local/scripts/manual.config.ts`).
+
+```ts
+import { expect, test } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
+
+test.use({ storageState: "./playwright/.auth/user.json" });
+
+const OUT = "_local/recon/<slug>";
+// Entry points from the brief. `scope` keeps the snapshot small: prefer the region the plan works
+// in (`main`, a form) over the whole body. `expand` lists the exact names of disclosures to open.
+const ENTRIES = [
+  { name: "list-page", url: "https://staging.<your-app>.example.com/<entry>", scope: "main", expand: [] as string[] },
+];
+// Popups often render outside the scoped region (portals): snapshot them separately.
+const POPUPS = "[role=dialog]:visible, [role=menu]:visible, [role=listbox]:visible, dialog[open]";
+const TEST_ID = "data-testid"; // match the project's testIdAttribute
+
+test("recon: <slug>", async ({ page }) => {
+  mkdirSync(OUT, { recursive: true });
+  for (const e of ENTRIES) {
+    const meta: Record<string, unknown> = {
+      url: e.url, scope_requested: e.scope, expanded: [], already_open: [], skipped_expand: [],
+    };
+    await page.goto(e.url);
+    // Dismiss the overlays listed in the brief here — same code as the spec.
+
+    // SPAs mount late: wait for the scope; fall back to <body> explicitly, and say so. `scope_found`
+    // only says the region existed — not that its content had loaded (check the snapshot for
+    // spinners / "Loading…"). A fallback snapshot is never evidence of absence.
+    let root = page.locator(e.scope).first();
+    try { await root.waitFor({ timeout: 10_000 }); meta.scope_used = e.scope; meta.scope_found = true; }
+    catch { root = page.locator("body"); meta.scope_used = "body (requested scope not found)"; meta.scope_found = false; }
+    // Every disclosure in scope, by accessible name — so a wrong `expand` name is fixed in one pass.
+    meta.disclosures = await root.locator("[aria-expanded], [aria-haspopup], [role=tab]").evaluateAll(els =>
+      els.map(el => (el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 60)));
+
+    for (const name of e.expand) {
+      // `.or()` here only finds the disclosure to open; the no-`.or()` rule is about AC targets.
+      const control = root.getByRole("button", { name, exact: true })
+        .or(root.getByRole("tab", { name, exact: true })).first();
+      try {
+        const kind = (await control.count()) === 0 ? "missing" : await control.evaluate(el => {
+          if (el.closest("a[href]")) return "a link — would navigate";
+          const tab = el.getAttribute("role") === "tab";
+          if (el.getAttribute("aria-expanded") === "true" || (tab && el.getAttribute("aria-selected") === "true")) return "open";
+          return el.hasAttribute("aria-expanded") || el.hasAttribute("aria-haspopup") || tab ? "closed" : "not-a-disclosure";
+        });
+        if (kind === "open") { (meta.already_open as string[]).push(name); continue; } // a click would close it
+        if (kind !== "closed") { (meta.skipped_expand as string[]).push(`${name} (${kind})`); continue; }
+        const popupsBefore = await page.locator(POPUPS).count();
+        await control.click();
+        // Wait until it really opened before reading — then give on-demand content a moment to settle.
+        if (await control.getAttribute("aria-expanded") !== null) await expect(control).toHaveAttribute("aria-expanded", "true");
+        else if (await control.getAttribute("role") === "tab") await expect(control).toHaveAttribute("aria-selected", "true");
+        else await expect.poll(() => page.locator(POPUPS).count(), { timeout: 5_000 }).toBeGreaterThan(popupsBefore);
+        await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+        (meta.expanded as string[]).push(name);
+      } catch (err) {
+        // eslint-disable-next-line no-control-regex
+        const msg = String(err).replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0].slice(0, 120);
+        (meta.skipped_expand as string[]).push(`${name} (failed: ${msg})`);
+      }
+      // Snapshot what this expansion opened NOW — opening the next menu may close this one.
+      const opened = page.locator(POPUPS);
+      for (let i = 0; i < await opened.count(); i++) {
+        writeFileSync(`${OUT}/${e.name}.after-${name.replace(/\W+/g, "-")}.popup-${i}.aria.yml`, await opened.nth(i).ariaSnapshot());
+      }
+    }
+
+    writeFileSync(`${OUT}/${e.name}.aria.yml`, await root.ariaSnapshot()); // whole file — never truncate
+    const popups = page.locator(POPUPS);
+    for (let i = 0; i < await popups.count(); i++) {
+      writeFileSync(`${OUT}/${e.name}.popup-${i}.aria.yml`, await popups.nth(i).ariaSnapshot());
+    }
+    meta.test_ids = await root.locator(`[${TEST_ID}]`).evaluateAll(
+      (els, attr) => els.map(el => el.getAttribute(attr)), TEST_ID);
+    // If the page is not the entry URL any more, this recon describes another page — say so.
+    meta.final_url = page.url();
+    meta.navigated_away = page.url().split(/[?#]/)[0] !== e.url.split(/[?#]/)[0];
+    writeFileSync(`${OUT}/${e.name}.meta.json`, JSON.stringify(meta, null, 1));
+    await page.screenshot({ path: `${OUT}/${e.name}.png`, fullPage: true });
+  }
+});
+```
+
+`locator.ariaSnapshot()` needs Playwright ≥ 1.49. On older versions, fall back to an element-scoped
+`innerText` plus a scoped list of roles/labels — never `document.body.innerText`.
+
+**Budget.** A whole-body snapshot of a busy SPA runs to tens of KB and is read into your context.
+Scope to the region the plan works in. If a snapshot is still larger than ~15 KB, narrow the scope
+or `grep` the file for the names you need — but never save a truncated snapshot: a cut file cannot
+prove that something is absent.
+
+### Using the recon to write the spec
+
+For each locator the spec needs, decide which kind it is:
+
+| Locator is for… | Found in the recon | Not found in the recon |
+|---|---|---|
+| **An AC target** — the element a step asserts on, or whose presence/behaviour the AC promises | "Found" means the snapshot has the role **and the exact name the AC uses**. Write the locator with that name — the AC's words, not the page's. A control with different wording is **not found** (a copy mismatch is itself a finding). | **Do not hunt for a look-alike.** Keep the locator the AC implies and run. If the step fails, it is a `FAIL` candidate — the recon backs "the element was not on the page" **only** within what it covered (below). |
+| **Navigation** — a means to get to the state under test, not itself asserted | Write the locator from the snapshot. | Look in the snapshot for the control that does the same job, use it, and record the change in `script_revisions`. |
+
+When in doubt whether a locator is an AC target, treat it as one.
+
+**What an absence proves.** "Not in the recon" means "not in the snapshot of `scope_used`, after the
+expansions in `expanded` (and the containers in `already_open`), plus the popup snapshots" — nothing
+more. Each expansion's popups are saved right after it (`<entry>.after-<name>.popup-<i>.aria.yml`),
+because opening the next menu may close the previous one; a menu whose file is missing was not
+captured, whatever `expanded` says. Content in a portal, in a container the recon did not open, or outside a narrow scope is
+simply not covered. A snapshot taken on the fallback (`scope_found: false` in `meta.json`) proves no
+absence at all, and neither does one that still shows a spinner or "Loading…" (`scope_found` says the
+region existed, not that its content had loaded) or one with `navigated_away: true`. Cite the exact files and the
+`meta.json` when you use the recon as absence evidence.
+
+### Script revisions are not retries
+
+"No retries" forbids running the same thing again hoping for green. Fixing the **mechanics** of a
+script and running it again is different — but only if it is visible.
+
+`script_revisions` lists **every deviation from the brief and every change to the spec after its
+first run**: step, before → after, reason, and the file that justified it (recon, log).
+
+**Allowed revisions — the canonical list** (the orchestrator and the reviewer check against it):
+
+1. A **navigation** locator that did not match (the brief named a link that is a button, a renamed
+   menu entry).
+2. An entry URL mistyped in the spec — the brief's URL is the truth.
+3. A dismissal for an overlay the brief lists.
+4. Evidence capture that touches no assertion: extra or focused screenshots, read-only logging.
+5. Run mechanics in the throwaway config: `outputDir`, reporter, viewport-independent screenshot
+   settings.
+6. Test structure that changes no assertion: after a failed **action** ended the shared test,
+   moving the steps that do not depend on it into their own `test()` (with their own setup) — say
+   in the report that they ran without the earlier steps' state; a `try/finally` that captures
+   evidence and lets the failure propagate.
+
+**Never:** change an expected value, remove or weaken an assertion (`expect` → `expect.soft` on a
+result is fine; deleting it is not), add waits, add a `try/catch` that swallows a failure, raise
+timeouts, use a forbidden interaction workaround, or swap an AC target for a different element.
+
+**Keep every run.** Playwright empties its output folder on each run, so give each run its own:
+`npx playwright test -c … --output _local/test-results/run-<n> … 2>&1 | tee _local/logs/run-<n>.log`.
+The reviewer compares the runs.
+
+A navigation revision corrects the **brief**, not the product: report it under *Script revisions*,
+not as a finding. It becomes a finding only when the AC itself names that control (then it was an
+AC target, and the table above applies).
+
+### What recon is not
+
+- **Not evidence.** A recon screenshot never backs a step's `PASS`/`FAIL` — steps cite screenshots
+  from the run. (A recon snapshot can back "the element was not on the page", within its coverage.)
+- **Not a crawler.** It visits the brief's entry pages, not the site.
+- **Not a plan.** It does not add, drop or reorder steps.
 
 ## Evidence discipline
 
@@ -67,16 +304,16 @@ A `PASS` backed by evidence that does not show what the sentence claims is worse
   interaction between them never happened. Cheap to check:
 
   ```bash
-  # Linux / Git Bash (GNU coreutils) — prints only the duplicated files
-  md5sum <evidence-dir>/*.png | sort | uniq -w32 -D
+  # Linux / Git Bash (GNU coreutils) — prints only the duplicated files (recon PNGs included)
+  md5sum <evidence-dir>/*.png _local/recon/<slug>/*.png | sort | uniq -w32 -D
 
   # macOS (BSD tools) — look for repeated hashes in the sorted list
-  shasum <evidence-dir>/*.png | sort
+  shasum <evidence-dir>/*.png _local/recon/<slug>/*.png | sort
   ```
 
   ```powershell
   # Windows PowerShell
-  Get-FileHash <evidence-dir>\*.png -Algorithm MD5 | Group-Object Hash | Where-Object Count -gt 1
+  Get-FileHash <evidence-dir>\*.png, _local\recon\<slug>\*.png -Algorithm MD5 | Group-Object Hash | Where-Object Count -gt 1
   ```
 
   In a real run this exposed a "sort menu opened" screenshot that was byte-identical to the closed
@@ -87,6 +324,11 @@ A `PASS` backed by evidence that does not show what the sentence claims is worse
   DOM; "X not found" only counts if you expanded the container first.
 - **Network claims are scoped to what you captured.** Only write "no request was fired" if the
   capture was global (blocklist). Otherwise write "no request to `<captured hosts>`".
+- **Recon output is not step evidence.** Screenshots under `_local/recon/` show the page before the
+  run; a step cites screenshots taken by the run. Include the recon PNGs in the duplicate check: a
+  step screenshot identical to a recon screenshot of the **entry state** means a step that claims a
+  change never changed the page. A match with a recon PNG taken **after an expansion** is expected
+  when the step opened the same container — check the recon's `meta.json` before flagging it.
 - **Before writing each `PASS`, re-open the evidence you are about to cite** and confirm it shows
   the state described. This is the step executors skip most often.
 - **If your model cannot view images, say so in the report** — never imply you looked at a
@@ -100,9 +342,11 @@ Everything here is written under the git-ignored scratch root (default `_local/`
 
 ```
 _local/
-├─ scripts/          throwaway spec + config
+├─ scripts/          throwaway spec + config (and the recon spec)
+├─ recon/<slug>/     recon output: aria snapshots, test ids, screenshots — see recon.md
 ├─ evidence/<slug>/  screenshots, video, trace
-└─ logs/             run output
+├─ logs/             run output (one log per run: run-<n>.log)
+└─ reports/          the reviewed result of each run: <slug>.json (orchestrator, after Step 7)
 ```
 
 Never put these files in the committed suite folder or in the repo root.
@@ -116,19 +360,28 @@ import { test, expect } from "@playwright/test";
 // Reuse the project's stored auth so login is free.
 test.use({ storageState: "./playwright/.auth/user.json" });
 
+// One test for the sequential plan, one test.step per plan step (see "One test()" below).
 test("manual: <one-line description>", async ({ page }) => {
-  await page.goto("https://staging.<your-app>.example.com/<entry-point>");
+  const shot = (n: number) =>
+    page.screenshot({ path: `_local/evidence/<slug>/step-${n}-${Date.now()}.png`, fullPage: true });
 
-  // Dismiss any onboarding / marketing overlay your app shows after navigation — after EVERY
-  // goto/reload that can trigger it. Otherwise it covers the page and ruins the evidence.
+  await test.step("1. <action from the plan>", async () => {
+    await page.goto("https://staging.<your-app>.example.com/<entry-point>");
+    // Dismiss any onboarding / marketing overlay your app shows after navigation — after EVERY
+    // goto/reload that can trigger it. Otherwise it covers the page and ruins the evidence.
 
-  // Step 1: <action> — prefer an existing helper; otherwise role/label-based locators.
-  await page.getByRole("button", { name: "<accessible name>" }).click();
+    // Action — prefer an existing helper; otherwise role/label-based locators (names from the AC).
+    await page.getByRole("button", { name: "<accessible name>" }).click();
 
-  // Assert the observable expected result with a web-first (auto-retrying) assertion.
-  await expect(page.getByRole("heading", { name: "<verbatim copy from spec>" })).toBeVisible();
+    // Result — web-first and SOFT: a failed expectation is recorded and the next steps still run.
+    await expect.soft(page.getByRole("heading", { name: "<verbatim copy from spec>" })).toBeVisible();
+    await shot(1);
+  });
 
-  await page.screenshot({ path: `_local/evidence/<slug>/step-1-${Date.now()}.png`, fullPage: true });
+  await test.step("2. <next action>", async () => {
+    // A failed ACTION (click timeout) still ends the test: steps that depend on it are BLOCKED.
+    await shot(2);
+  });
 });
 ```
 
@@ -143,6 +396,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./",
+  // Relative to this file: keeps Playwright's failure artifacts inside the scratch root
+  // (_local/test-results), never next to a symlinked node_modules or in the user's home folder.
+  outputDir: "../test-results",
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -195,14 +451,82 @@ Extend `NOISE` with your own vendors (bot protection, payments, product analytic
 
 - **Locator priority:** `getByRole` → `getByLabel` / `getByPlaceholder` → `getByText` →
   `getByTestId` → CSS/XPath (last resort). `getByText` is fine when the assertion *is* about
-  verbatim copy being visible.
+  verbatim copy being visible. Take role and accessible name from the recon snapshot when you
+  have one (`recon.md`), not from a guess.
 - **Reuse the project's page objects first** — they are maintained and shared with the committed suite.
 - **Web-first assertions** (`toBeVisible`, `toHaveText`, `toHaveURL`, …) over truthiness checks.
 - **No hard waits:** never `page.waitForTimeout(...)`. Assert on observable state — an arbitrary
   wait can also mask a real app bug.
 - **Reuse `storageState`:** never script the login UI inside a scenario.
+- **One `test()` for a sequential plan, `expect.soft` for each step's result.** Steps that build
+  on each other share page state. Split across several tests, that state does not survive a failure:
+  Playwright restarts the worker after a failed test (re-running `beforeAll`), so the next step starts
+  from a fresh page — and the reset then looks like an app bug ("the panel closed by itself"). Put the
+  plan in one test, one `test.step()` per step, and assert each step's **result** with
+  `expect.soft(...)` so a failed expectation is recorded without hiding the steps after it. A failed
+  **action** (a click that times out) still ends the test: mark the steps that depended on it
+  `BLOCKED`, and give steps that do not depend on it a test of their own (with their own setup).
+- **Tall pages: add a focused screenshot.** A full-page screenshot of a long list can be thousands of
+  pixels tall and unreadable once scaled. Keep the full-page shot when the claim is about the whole
+  page ("no modal appeared"), and add a screenshot of the region the step asserts on
+  (`locator.screenshot()` or the viewport after `scrollIntoViewIfNeeded()`).
 - **Short action timeouts, always.** If a run dies, close the browser context before reporting —
   the user is looking at the screen.
+
+### Interaction workarounds — forbidden
+
+Each of these makes an interaction "succeed" where a user's would not, which turns a real bug
+(an overlay covering the button, a control that is not clickable, a hidden element) into a `PASS`:
+
+- `click({ force: true })` — skips the actionability checks a real click must pass.
+- Clicking through script: `locator.evaluate(el => el.click())`, `dispatchEvent("click")`,
+  `page.evaluate(() => document.querySelector(…).click())`.
+- Clicking by coordinates (`page.mouse.click(x, y)`) to reach an element you could not locate.
+- Removing or hiding nodes to clear the way (`el.remove()`, `style.display = "none"`) — except the
+  overlays the brief explicitly lists as known noise, dismissed the way a user would (their close
+  button) or by the project's own helper for that overlay.
+- Falling back to another locator inside a `try/catch` (or `.or()`) when the first one fails to
+  reach an AC target.
+
+If an interaction only works through one of these, the interaction **failed**: record what blocked
+it (screenshot of the covering element, the actionability error) as the step's observation.
+
+### Strict mode, ambiguity and scoping
+
+A locator that matches several elements throws in strict mode. That error is information — the
+page has more than one candidate — not something to silence:
+
+- **Scope it** to the region the step is about: `page.getByRole("dialog").getByRole("button", { name: "Save" })`,
+  `page.getByRole("row", { name: /Jane Doe/ }).getByRole("button", { name: "Edit" })`,
+  `locator.filter({ hasText: "…" })`.
+- `.first()` / `.nth(i)` / `.last()` only when the position **is** the thing under test ("the first
+  result is the cheapest") — say so in a comment next to it.
+
+### Structure assertions with `toMatchAriaSnapshot`
+
+When an AC is about structure — the items of a menu, the order of a list, the fields of a form —
+`expect(locator).toMatchAriaSnapshot(template)` asserts it in one step (Playwright ≥ 1.49):
+
+```ts
+// Template written FROM THE AC, never pasted from a recon file or from the screen.
+await expect(page.getByRole("menu", { name: "Sort by" })).toMatchAriaSnapshot(`
+  - menuitem "Price: low to high"
+  - menuitem "Price: high to low"
+  - menuitem "Newest"
+`);
+```
+
+Matching is **partial**: extra items on the page pass, and so do children the template does not
+list. If the AC says "only these three options", also assert the count (`toHaveCount(3)` on the
+items) or add `- /children: equal` to the template (Playwright ≥ 1.52). Never generate the template from what the page shows — that
+asserts today's state, bug included.
+
+### Missing accessible names
+
+An interactive element with no accessible name (an icon button without `aria-label`, an unlabelled
+input) cannot be reached with `getByRole`/`getByLabel`. Reach it with the next locator in the
+priority list, and record it as an observation of kind `a11y` in the report — never silently. It is
+`non-blocking (Low)` by default under the severity gate unless the ticket is about accessibility.
 
 ## What you return
 
@@ -226,8 +550,10 @@ Step 1: <description> — ✅ PASS / ❌ FAIL / ⚠️ BLOCKED / 🔗 BLOCKED-BY
 
 Step 2: …
 
-Findings: <numbered — for each: app bug, PO decision, or dependency block; tagged `blocking` or
-          `non-blocking (Low)` with the severity-gate criterion in one line>
+Recon: <ran — `_local/recon/<slug>/` | skipped — the brief's reason (page objects / fresh knowledge-bank locators for every target / single assertion / first-visit state)>
+Script revisions: <none | every deviation from the brief and every change after the first run — step, before → after, reason, source; extra probe/diagnostic runs included>
+Findings: <numbered — for each: app bug, PO decision, dependency block, or a11y observation; tagged
+          `blocking` or `non-blocking (Low)` with the severity-gate criterion in one line>
 Could not verify: <what, and why — missing data, account tier, known bug in the way>
 Summary: <one line — what worked, what didn't, what's still unverified>
 Suggested next action: <…>
@@ -259,9 +585,17 @@ re-interpreting prose:
     { "id": 1, "status": "PASS", "evidence": ["_local/evidence/<slug>/step-1-....png"], "note": "" }
   ],
   "findings": [
-    { "title": "", "kind": "app-bug | po-decision | dependency", "severity": "blocking | non-blocking", "gate": "<criterion>" }
+    { "title": "", "kind": "app-bug | po-decision | dependency | a11y", "severity": "blocking | non-blocking", "gate": "<criterion>" }
   ],
   "duplicate_screenshots": [],
+  "recon": { "ran": true, "dir": "_local/recon/<slug>/", "skipped_reason": "" },
+  "script_revisions": [
+    { "step": 2, "before": "getByRole('link', { name: 'Filters' })", "after": "getByRole('button', { name: 'More filters' })", "reason": "navigation locator; the control is a button", "source": "_local/recon/<slug>/list-page.aria.yml" }
+  ],
   "scripts": ["_local/scripts/_manual-<slug>.spec.ts"]
 }
 ```
+
+`script_revisions` lists every deviation from the brief's locators and URLs and every change made
+to the spec after its first run — only the kinds on the canonical list in `recon.md` are allowed. An
+empty list means the spec ran as the brief described, as first written.

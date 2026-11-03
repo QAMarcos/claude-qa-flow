@@ -71,7 +71,8 @@ comment is the **only** artifact — QA with no bug filed, or ad-hoc — the evi
 - **Mark checklist items complete** (when the plan came from the ticket's checklist): only steps that
   passed cleanly. Ask once before mutating.
 - **Do not move the ticket between columns.** Suggest the state change; the user decides.
-- **Record what the next session would have to rediscover** in your harness's persistent memory or
-  project notes (e.g. `AGENTS.md` / `CLAUDE.md`): a trap that produced a false finding, the feature's
+- **Record what the next session would have to rediscover** — in the project's knowledge bank
+  (`knowledge-bank.md`, Step 8, with the user's approval) or, without one, in your harness's
+  persistent memory or project notes (e.g. `AGENTS.md` / `CLAUDE.md`): a trap that produced a false finding, the feature's
   state (mocked / no backend yet), or an environment bug that **stopped** reproducing — stale notes
   make the next run assume a failure that was already fixed.

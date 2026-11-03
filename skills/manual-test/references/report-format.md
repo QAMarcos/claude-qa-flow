@@ -17,8 +17,10 @@ Step 1: <description> — ✅ PASS / ❌ FAIL / ⚠️ BLOCKED / 🔗 BLOCKED-BY
 
 Step 2: …
 
-Findings: <numbered — for each: app bug, PO decision, or dependency block; tagged `blocking` or
-          `non-blocking (Low)` with the severity-gate criterion in one line>
+Recon: <ran — `_local/recon/<slug>/` | skipped — the brief's reason (page objects / fresh knowledge-bank locators for every target / single assertion / first-visit state)>
+Script revisions: <none | every deviation from the brief and every change after the first run — step, before → after, reason, source; extra probe/diagnostic runs included>
+Findings: <numbered — for each: app bug, PO decision, dependency block, or a11y observation; tagged
+          `blocking` or `non-blocking (Low)` with the severity-gate criterion in one line>
 Could not verify: <what, and why — missing data, account tier, known bug in the way>
 Summary: <one line — what worked, what didn't, what's still unverified>
 Suggested next action: <…>
@@ -50,9 +52,17 @@ re-interpreting prose:
     { "id": 1, "status": "PASS", "evidence": ["_local/evidence/<slug>/step-1-....png"], "note": "" }
   ],
   "findings": [
-    { "title": "", "kind": "app-bug | po-decision | dependency", "severity": "blocking | non-blocking", "gate": "<criterion>" }
+    { "title": "", "kind": "app-bug | po-decision | dependency | a11y", "severity": "blocking | non-blocking", "gate": "<criterion>" }
   ],
   "duplicate_screenshots": [],
+  "recon": { "ran": true, "dir": "_local/recon/<slug>/", "skipped_reason": "" },
+  "script_revisions": [
+    { "step": 2, "before": "getByRole('link', { name: 'Filters' })", "after": "getByRole('button', { name: 'More filters' })", "reason": "navigation locator; the control is a button", "source": "_local/recon/<slug>/list-page.aria.yml" }
+  ],
   "scripts": ["_local/scripts/_manual-<slug>.spec.ts"]
 }
 ```
+
+`script_revisions` lists every deviation from the brief's locators and URLs and every change made
+to the spec after its first run — only the kinds on the canonical list in `recon.md` are allowed. An
+empty list means the spec ran as the brief described, as first written.

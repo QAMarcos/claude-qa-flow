@@ -51,6 +51,17 @@ const TRACKER_CLI_AND_GIT = [
   "jira issue create*", "jira issue comment*", "jira issue edit*",
   "git*commit*", "git*push*", "git*merge*", "git*rebase*", "git*cherry-pick*",
 ].map((p) => `*${p}`);
+// Shell writes into the default knowledge root (curated by the orchestrator with the user's OK).
+// Globs cannot tell a destination from a source, so this is coarser than the Claude Code hook: it
+// also denies e.g. `cp .qa-flow/knowledge/x.md _local/` or `grep "->" .qa-flow/knowledge` — read
+// with `cat`/`grep` without `>` instead. OpenCode's `edit` tool is not path-scoped here, so a
+// file-tool edit is covered by instructions only. Verbs match only as a command word (line start or
+// after a space), so `platform` does not trip `rm`.
+const KNOWLEDGE_WRITES = [
+  "*>*.qa-flow/knowledge*", "*>*.qa-flow\\knowledge*",
+  ...["cp", "mv", "rm", "tee", "sed -i", "Set-Content", "Add-Content", "Out-File", "Remove-Item", "New-Item"]
+    .flatMap((w) => [`${w} *.qa-flow/knowledge*`, `* ${w} *.qa-flow/knowledge*`, `${w} *.qa-flow\\knowledge*`, `* ${w} *.qa-flow\\knowledge*`]),
+];
 // Read-only reviewer: deny everything, allow inspection commands, and allow `sort` / `uniq` only in
 // the argument-less forms the dedupe pipelines use (so `sort -o f` and `uniq in out` stay denied).
 // Anything piped into another program is denied by the default rule. Chains of allowed reads
@@ -72,7 +83,7 @@ const OPENCODE_PERMISSION = {
     "  task: deny",
     "  bash:",
     '    "*": allow',
-    ...[...MUTATING_HTTP, ...TRACKER_CLI_AND_GIT].map((p) => `    ${JSON.stringify(p)}: deny`),
+    ...[...MUTATING_HTTP, ...TRACKER_CLI_AND_GIT, ...KNOWLEDGE_WRITES].map((p) => `    ${JSON.stringify(p)}: deny`),
   ],
   "read-only": [
     "permission:",

@@ -87,7 +87,7 @@ To enable it, add this to ${settings} (or install the plugin instead, which enab
 
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash|PowerShell",
+      { "matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [ { "type": "command", "command": "node \\"${hookPath}\\"" } ] }
     ]
   }

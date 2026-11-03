@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.1.0 — 2026-11-03
+
+**Upgrading from 2.0:** re-run the installer with `--force` (or update the plugin). Without it you
+keep the 2.0 `manual-test` and guard. A hook installed by hand needs the wider matcher the installer
+prints.
+
+### Added
+
+- **Recon before scripting** (`manual-test`). The executor copies a template and records how the
+  page is built (scoped aria snapshot, popups, test ids) without submitting or navigating. Recon
+  says how to reach an element, never what to expect: a missing AC target is a `FAIL` candidate,
+  never swapped for a look-alike.
+- **Knowledge bank** (`.qa-flow/knowledge/`, optional). Small dated entries (gotchas, locators,
+  product decisions, known bugs, test data) read before each run.
+  - A product decision reaches only the reviewer, as "verify against <ticket>".
+  - Updates are written only on their own explicit yes.
+  - `check-knowledge.mjs` rejects secrets and emails, and flags stale entries.
+- **`scan-regression-candidates`**: sweeps past runs and returns a short, scored list of flows worth
+  a permanent test. It filters out probes and one-offs and redacts PII from what it reads.
+- **`promote-to-regression`**: turns one reviewed run into a spec in your suite's conventions.
+  - Promotes only on a value/cost gate.
+  - Proves the spec stable and able to fail.
+  - Gets an independent review and asks before any commit.
+- `manual-test` saves each reviewed result to `_local/reports/<slug>.json` for the two skills
+  above.
+
+### Changed
+
+- **No interaction workarounds:** no `force`, script or coordinate clicks, no removed overlays, no
+  `try/catch` / `.or()` around an AC target.
+- **`script_revisions`:** every change to the script is logged against a fixed list of allowed
+  revisions, and the reviewer checks it.
+- Specs use one `test()` per plan with `test.step` and `expect.soft`.
+- Accessibility notes are Low by default.
+- A bug is filed as blocking only when you say so.
+- The guard hook also stops the executor from writing the knowledge bank and the reviewer from
+  editing files. OpenCode gets equivalent deny rules.
+- CI adds knowledge-checker (72), inventory (34) and recon-template sync checks; guard cases go from
+  89 to 146.
+
 ## 2.0.0 — 2026-10-19
 
 Distilled from three months of daily use on a real product team.

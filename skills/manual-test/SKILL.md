@@ -4,7 +4,7 @@ description: Execute exploratory/manual QA against a web app, driven by either a
 license: MIT
 compatibility: Any Agent Skills harness (Claude Code, OpenCode, Codex, ...). Needs shell access, Node.js and @playwright/test in the project under test. Subagents recommended; executor and reviewer need a vision-capable model.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   routing: router
 ---
 
@@ -43,11 +43,13 @@ the review only works if the reviewer did not watch the run.
 - Confirm the environment. Default is **staging**; production only with an explicit instruction in this turn.
 - Confirm how to seed any state the standard fixture cannot reach.
 - List the **known bugs** that cross the plan, so the executor does not re-investigate them.
+- Read the project's **knowledge bank**, when it has one, and route each entry to the brief or the
+  reviewer (Step 1).
 - After the executor returns: dispatch the **independent reviewer** (Step 6) and, only with the
-  user's approval, the tracker writes (Step 7).
+  user's approval, the tracker writes (Step 7) and the knowledge-bank update (Step 8).
 
 **Three distinct roles, in this order:** executor (Steps 3–5) → reviewer (Step 6) → tracker writer
-(Step 7, via `file-bug-ticket`). The reviewer is **never** a fork of the executor or of this
+(Step 7, via `file-bug-ticket`). The knowledge-bank update (Step 8) stays with the orchestrator. The reviewer is **never** a fork of the executor or of this
 conversation: it must reach the evidence without inheriting the conclusions of whoever produced it.
 Pass context through the prompt, not through inheritance.
 
@@ -76,6 +78,10 @@ A thin prompt ("run these scenarios") is what produces a fragile report. Carry a
 ```
 [Generic subagent only: Read <absolute path>/roles/test-executor.md and follow it.]
 Environment: <staging|prod>. User/fixture: <which>.
+Recon template: <absolute path to this skill>/assets/recon.template.spec.ts — copy it, fill in
+OUT / ENTRIES / overlay only. [Or: "Recon may be skipped — <reason>": page objects cover the whole
+flow / fresh knowledge-bank locators for every target: … / single assertion, locator: … /
+first-visit state (or: "run recon as <second fixture user>")]
 
 ## Ticket and ACs
 <ACs verbatim — do not paraphrase; the executor compares this text with the screen>
@@ -92,10 +98,12 @@ If something out of scope fails, record it as an observation, not a ticket failu
 
 ## App/environment gotchas
 <bot protection, overlays to dismiss, URL-based seeding, selectors,
- baseline console noise, short timeouts, network capture by blocklist>
+ baseline console noise, short timeouts, network capture by blocklist,
+ entry URLs for recon — or why recon can be skipped>
 
 ## Rules
 Throwaway files in _local/. Do not commit. Do not write to the tracker.
+Recon first, read-only; it shows how to reach elements, never what to expect.
 Evidence must prove what it claims — a failed click is not a new state.
 Do not ask anything; if stuck, return what blocked you, what passed, and the evidence collected.
 ```
@@ -134,8 +142,11 @@ If the user gives both, ad-hoc wins; ask whether to still pull the ticket for co
 - **E2E repo** — run from your Playwright project so fixtures and page objects are reusable.
 - **Auth fixtures** — your stored `storageState` file(s), e.g. `playwright/.auth/user.json`.
 - **Page-object helpers** — prefer them over raw selectors when one already covers the flow.
+- **Knowledge root** — where the project keeps its knowledge bank (default `.qa-flow/knowledge/`,
+  optional). Curated, not throwaway: see [`references/knowledge-bank.md`](references/knowledge-bank.md).
 - **Scratch root** — one git-ignored folder for everything throwaway (default `_local/`, with
-  `scripts/`, `evidence/<slug>/`, `logs/`). Never inside the committed suite or the repo root.
+  `scripts/`, `recon/<slug>/`, `evidence/<slug>/`, `logs/`). Never inside the committed suite or
+  the repo root.
 - **Tracker** — `TRACKER_API_BASE` and `TRACKER_TOKEN`, read at runtime from env or a git-ignored
   `.env.local`. Never inline, never commit, never print.
 
@@ -171,12 +182,27 @@ If the user gives both, ad-hoc wins; ask whether to still pull the ticket for co
    - the ticket's links (what already `blocks` it);
    - sibling bugs in the same epic/project;
    - a tracker text search for the feature name restricted to bugs;
+   - the knowledge bank's `known-bug` entries — pointers only: confirm each one's state in the
+     tracker before listing it;
    - your project notes / persistent memory — environment bugs usually live there.
 
    For each, write into the plan: "if crossed, label `BLOCKED — <id> known`, do not investigate, do not file".
 6. **Confirm with the user/PO what has no data or backend yet.** Front-end delivered before its
    backend is common and changes the reading of half the ACs — those become `BLOCKED-BY-DEPENDENCY`,
    not `FAIL`. Ask before running, not after failing.
+
+**Both modes — read the knowledge bank** (when the project has one). Run
+`node <this skill's dir>/scripts/check-knowledge.mjs <knowledge root> --json` first: it flags stale
+entries and anything that should not be there. Then read the files for the areas the run touches and
+route each entry as [`references/knowledge-bank.md`](references/knowledge-bank.md) says — `gotcha`,
+`locator` and `data` into the executor brief; `known-bug` into *Known bugs* after checking the
+tracker (unreachable tracker → leave it out and say so); fresh `intent` **only to the reviewer**, as
+"verify against <ticket>", never to the executor and never as a verdict; a stale `intent` is a
+question for the user first. Entries the checker flags are not routed — propose the fix. Stale
+entries go in marked "unverified since <date>". Fresh `locator` entries let you skip recon only when
+they cover every AC target and navigation step — list them in the brief (the other reasons to skip
+it are in [`references/recon.md`](references/recon.md): page objects, a single assertion, first-visit
+state — and the brief always names the reason).
 
 **Ad-hoc mode:** take the scenario verbatim. If it references external context ("as in ticket X",
 "like in design Y"), follow the same fetch-or-ask loop.
@@ -222,12 +248,15 @@ Otherwise proceed — the user invoked this skill to see the run, not to re-appr
 
 Dispatch the executor (Step 0) with the six-section brief. Its procedure is in
 [`roles/test-executor.md`](roles/test-executor.md); the templates it uses are in
-[`references/playwright-templates.md`](references/playwright-templates.md), its evidence rules in
+[`references/playwright-templates.md`](references/playwright-templates.md), the read-only recon it
+runs before writing the spec in [`references/recon.md`](references/recon.md), its evidence rules in
 [`references/evidence-discipline.md`](references/evidence-discipline.md), and the report it returns
 in [`references/report-format.md`](references/report-format.md).
 
 When it returns, check the machine-checkable JSON block first: every `PASS` cites evidence, no
-duplicate screenshots back different steps, every finding has a severity proposal.
+duplicate screenshots back different steps, every finding has a severity proposal, and every
+`script_revisions` entry is of a kind on the canonical list in
+[`references/recon.md`](references/recon.md) (never an AC target or an expected value).
 
 **Fallbacks:**
 
@@ -243,8 +272,11 @@ duplicate screenshots back different steps, every finding has a severity proposa
 never a fork). Its procedure is in [`roles/evidence-reviewer.md`](roles/evidence-reviewer.md).
 
 Its prompt carries, in writing: the ACs verbatim; the agreed scope and why; the known bugs that do
-not count as findings; what was executed and the result item by item; the findings with their
-proposed classification; and **the paths to the evidence, logs and scripts** — the reviewer must be
+not count as findings; the knowledge bank's fresh `intent` entries for this area (and stale ones the
+user confirmed), each as "verify against <ticket>: <summary>" with its `last_verified`; what was
+executed and the result item by item; the findings with their
+proposed classification; and **the paths to the evidence, recon output, logs and scripts**, plus the
+`script_revisions` list — the reviewer must be
 able to open the screenshots and read the scripts, not just trust the report. It returns four
 sections: missing scenarios, fragile conclusions, findings to promote/demote (with severity), and
 sign-off.
@@ -259,6 +291,13 @@ Every finding carries `blocking` or `non-blocking (Low)` per the
 finding to blocking is the user's call. Before accepting any finding — the executor's or the
 reviewer's — check it against product intent (same file).
 
+**Save the reviewed result** to `<scratch root>/reports/<slug>.json` as soon as the review is in: the
+executor's JSON block plus, at the top level, `"reviewer_verdict": "PASS | FAIL | PARTIAL"`,
+`"accepted_steps": [ids the reviewer accepted as PASS]`, `"confirmed_findings": [titles]` and
+`"reviewed_at": "YYYY-MM-DD"` — the reviewer's verdict is the one later skills trust. No approval needed — it is a throwaway file like the rest of the scratch
+root, written whether or not anything is filed — and it is what `scan-regression-candidates` and
+`promote-to-regression` read later.
+
 ### 7. Follow-ups: comment on the ticket and file the bugs
 
 Only after Step 6, and with the user's approval. All in English. Full rules in
@@ -268,11 +307,28 @@ Only after Step 6, and with the user's approval. All in English. Full rules in
   evidence attached and referenced by filename; verify everything with a GET.
 - File bugs through the `file-bug-ticket` skill with fields **already resolved** and the body
   **already written by you, in a file**.
+- A bug goes in as **blocking** only if the user's approval says so — "file the bug" approves the
+  filing, not a promotion past the severity gate's default.
 - One index comment on the parent, **≤ 800 characters of prose**, with evidence embedded when it is
   the only artifact.
 - Mark checklist items complete only for clean passes, after asking once.
 - Do not move the ticket between columns — suggest; the user decides.
-- Record what the next session would have to rediscover in your project notes / memory.
+
+### 8. Knowledge-bank update (proposed, then approved)
+
+After Step 6 — whether or not anything was filed in Step 7: ad-hoc runs and clean passes also teach
+something. Propose a short diff of the knowledge bank: new gotchas, `locator` entries **only** for
+steps the reviewer accepted as `PASS`, `intent` entries **only** with a source (ticket / PO
+comment), entries the run contradicted (update or remove) and entries it confirmed (bump
+`last_verified` — for an `intent`, only if its source was re-opened this round). Run the checker on
+a scratch copy of the proposal **before** showing it, and ask about it as its own question: a yes to
+Step 7 or silence is not a yes to the knowledge bank. Write only what was approved; anything that
+still needs changing after the write is shown again first. Rules and what never goes in:
+[`references/knowledge-bank.md`](references/knowledge-bank.md). The executor and the reviewer never
+edit the knowledge bank.
+
+If the project has no knowledge bank, record what the next session would have to rediscover in your
+project notes / memory instead — or offer to start one.
 
 ## Rules
 
@@ -292,6 +348,9 @@ Only after Step 6, and with the user's approval. All in English. Full rules in
   (1000, or 500 for a simple front-end bug). Count before posting; if a real reason needs more, ask.
 - **Nothing reaches the tracker without the Step 6 review.** The cost of a wrong finding there is
   credibility with the team.
+- **The knowledge bank informs, it never decides.** An entry can tell the executor how to reach a
+  page or the reviewer what to re-check; it never sets an expected result, skips a step or demotes a
+  finding. No credentials, personal data or URLs with query strings in it, ever.
 - **Evidence must prove the claim.** In doubt, `INCONCLUSIVE`.
 - **Before filing a bug, look for the sentence that says it is the product working.**
 - **A known bug is not a finding.** Label, reload, move on.
@@ -305,8 +364,10 @@ Only after Step 6, and with the user's approval. All in English. Full rules in
 - **Tracker 404** → wrong id. Print the id used and stop.
 - **Playwright login failure** (`storageState` expired) → regenerate the auth fixture or ask the user
   to refresh credentials. Behind bot protection? Confirm the `userAgent`/header is configured.
-- **Selector not found / not visible** within the action timeout → a test finding, not a tooling
-  error. Report it as the step's observation.
+- **Selector not found / not visible** within the action timeout → for an **AC target**, a test
+  finding, not a tooling error: report it as the step's observation, with the recon snapshot if it
+  shows the element was never on the page. For a **navigation** locator absent from the recon, a
+  scripting error: fix it from the recon, log it in `script_revisions`, re-run (`references/recon.md`).
 - **External link unfetchable** → ask the user for the content. Don't proceed on guesses.
 
 ## Notes

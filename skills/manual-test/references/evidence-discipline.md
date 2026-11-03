@@ -13,16 +13,16 @@ A `PASS` backed by evidence that does not show what the sentence claims is worse
   interaction between them never happened. Cheap to check:
 
   ```bash
-  # Linux / Git Bash (GNU coreutils) — prints only the duplicated files
-  md5sum <evidence-dir>/*.png | sort | uniq -w32 -D
+  # Linux / Git Bash (GNU coreutils) — prints only the duplicated files (recon PNGs included)
+  md5sum <evidence-dir>/*.png _local/recon/<slug>/*.png | sort | uniq -w32 -D
 
   # macOS (BSD tools) — look for repeated hashes in the sorted list
-  shasum <evidence-dir>/*.png | sort
+  shasum <evidence-dir>/*.png _local/recon/<slug>/*.png | sort
   ```
 
   ```powershell
   # Windows PowerShell
-  Get-FileHash <evidence-dir>\*.png -Algorithm MD5 | Group-Object Hash | Where-Object Count -gt 1
+  Get-FileHash <evidence-dir>\*.png, _local\recon\<slug>\*.png -Algorithm MD5 | Group-Object Hash | Where-Object Count -gt 1
   ```
 
   In a real run this exposed a "sort menu opened" screenshot that was byte-identical to the closed
@@ -33,6 +33,11 @@ A `PASS` backed by evidence that does not show what the sentence claims is worse
   DOM; "X not found" only counts if you expanded the container first.
 - **Network claims are scoped to what you captured.** Only write "no request was fired" if the
   capture was global (blocklist). Otherwise write "no request to `<captured hosts>`".
+- **Recon output is not step evidence.** Screenshots under `_local/recon/` show the page before the
+  run; a step cites screenshots taken by the run. Include the recon PNGs in the duplicate check: a
+  step screenshot identical to a recon screenshot of the **entry state** means a step that claims a
+  change never changed the page. A match with a recon PNG taken **after an expansion** is expected
+  when the step opened the same container — check the recon's `meta.json` before flagging it.
 - **Before writing each `PASS`, re-open the evidence you are about to cite** and confirm it shows
   the state described. This is the step executors skip most often.
 - **If your model cannot view images, say so in the report** — never imply you looked at a

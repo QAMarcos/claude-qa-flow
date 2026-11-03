@@ -28,6 +28,9 @@ members, credentials or domain-specific examples. Tracker and app details stay a
 node scripts/build-agents.mjs          # after editing a role or a reference a role includes
 node scripts/build-agents.mjs --check  # generated files are up to date
 node scripts/test-guard.mjs            # guard regression cases
+node scripts/test-knowledge.mjs        # knowledge-bank checker regression cases
+node scripts/check-recon-template.mjs  # recon template file == block in recon.md (--fix to sync)
+node scripts/test-inventory.mjs        # scan inventory regression cases
 claude plugin validate .               # if you have Claude Code installed
 ```
 
@@ -38,4 +41,5 @@ claude plugin validate .               # if you have Claude Code installed
 - Changing what the skills claim? Keep README, CHANGELOG and the SKILL.md files consistent, and do
   not claim a harness or behaviour you have not tested.
 
-CI runs the generated-files check, the guard cases and the skill-name check on every push and PR.
+CI runs the generated-files check, the guard cases, the knowledge-checker cases, the inventory
+cases, the recon-template sync check and the skill-name check on every push and PR.
